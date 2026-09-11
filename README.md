@@ -8,7 +8,7 @@ mobile-first single-page app on top of Supabase.
 this version runs against its own isolated Supabase project under a fictional brand and
 contains **only fictional data** — no real clients, staff, diagnoses or contact details.
 
-🔗 **Live demo:** _(Netlify URL — coming)_
+🔗 **Live demo:** https://equinoterapia-vista-verde.netlify.app
 
 ## Demo logins
 
@@ -73,6 +73,18 @@ New accounts are provisioned by a trigger on `auth.users` that creates the match
 6. Serve the folder statically (`python3 -m http.server 8123`)
 
 [`supabase/reset.sql`](supabase/reset.sql) wipes the seeded data if you need to start over.
+
+## Refreshing the demo data
+
+The seed generates every date relative to the moment it runs: therapy sessions span three
+weeks back to one week ahead, the weekly plan is pinned to the current week, and time
+entries cover the last 14 days. Left alone, the demo therefore drifts — after a couple of
+weeks the agenda shows no upcoming sessions and the overtime balance for the current pay
+period reads zero.
+
+To re-anchor everything to today, run [`supabase/reset.sql`](supabase/reset.sql) followed
+by [`supabase/seed.sql`](supabase/seed.sql) in the Supabase SQL editor. The auth users are
+left untouched — only the data is regenerated.
 
 ## Differences from the production build
 
