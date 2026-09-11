@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Equinoterapia Vista Verde · Gestión</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="styles.css?v=7">
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div style="text-align:center;">
+    <img src="/logo.svg" alt="Equinoterapia Vista Verde" style="width:120px;height:auto;margin-bottom:0.5rem;">
+  </div>
+  <div>
+    <div class="auth-title">Equinoterapia Vista Verde · Gestión</div>
+    <div class="auth-sub" style="margin-top:6px;">Demo pública · datos ficticios</div>
+  </div>
+  <div class="auth-card">
+    <div>
+      <div class="field-label">Correo electrónico</div>
+      <input type="email" id="auth-email" placeholder="tu@correo.com" autocomplete="email">
+    </div>
+    <div>
+      <div class="field-label">Contraseña</div>
+      <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="auth-error" id="auth-error"></div>
+    <button class="btn-primary" onclick="login()" id="login-btn">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen" style="flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-left">
+      <img src="/logo.svg" alt="Vista Verde" style="height:30px;width:auto;opacity:0.9;">
+      <div class="topbar-info">
+        <div class="topbar-name" id="top-name">—</div>
+        <div class="topbar-role" id="top-role">—</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="logout-btn" onclick="logout()" title="Salir">⏏</button>
+    </div>
+  </div>
+  <div class="content" id="main-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- EXTRA TASK MODAL -->
+<div class="modal-overlay" id="extra-modal" style="display:none;" onclick="if(event.target===this)closeExtraModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;">
+      <div class="modal-title">Nueva tarea extra</div>
+      <button class="modal-close" onclick="closeExtraModal()">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Nombre de la tarea</div>
+      <input class="form-input" id="et-name" placeholder="Ej: Limpiar almacén" type="text">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Asignar a</div>
+      <div class="person-toggle-row" id="et-persons"></div>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Fecha</div>
+      <input class="form-input" id="et-date" type="date">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Duración estimada (minutos)</div>
+      <input class="form-input" id="et-dur" placeholder="Ej: 45" type="number" min="5" max="480">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Nota (opcional)</div>
+      <input class="form-input" id="et-note" placeholder="Instrucciones adicionales…" type="text">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Repetición</div>
+      <div class="recurrence-row">
+        <button class="rec-opt selected" data-val="once" onclick="selectRec(this)">Solo esta vez</button>
+        <button class="rec-opt" data-val="daily" onclick="selectRec(this)">Cada día</button>
+        <button class="rec-opt" data-val="weekly" onclick="selectRec(this)">Cada semana</button>
+        <button class="rec-opt" data-val="mon-fri" onclick="selectRec(this)">Lun–Vie</button>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="saveExtraTask()" style="margin-top:4px;">Guardar tarea →</button>
+  </div>
+</div>
+
+<!-- EXTRA SESSION MODAL -->
+<div class="modal-overlay" id="extra-session-modal" style="display:none;" onclick="if(event.target===this)closeExtraSessionModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;">
+      <div class="modal-title">Sesión extra</div>
+      <button class="modal-close" onclick="closeExtraSessionModal()">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Fecha</div>
+      <input class="form-input" type="date" id="es-date">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Hora</div>
+      <span id="es-time-wrap"></span>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Tipo</div>
+      <div class="recurrence-row">
+        <button class="rec-opt selected" data-val="reposicion" onclick="selectEsTipo(this)">Reposición</button>
+        <button class="rec-opt" data-val="primera_vez" onclick="selectEsTipo(this)">Primera vez</button>
+        <button class="rec-opt" data-val="extra" onclick="selectEsTipo(this)">Extra</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Cliente</div>
+      <div class="recurrence-row" style="margin-bottom:8px;">
+        <button class="rec-opt selected" data-val="list" onclick="selectEsType(this)">De la lista</button>
+        <button class="rec-opt" data-val="free" onclick="selectEsType(this)">Nombre libre</button>
+      </div>
+      <div id="es-list-section">
+        <select class="form-input" id="es-client"></select>
+      </div>
+      <div id="es-free-section" style="display:none;">
+        <input class="form-input" id="es-client-name" placeholder="Nombre del cliente…" type="text">
+        <div class="form-row" style="margin-top:8px;">
+          <div class="field-label">Caballo</div>
+          <select class="form-input" id="es-horse-free"></select>
+        </div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="saveExtraSession()" style="margin-top:4px;">Guardar sesión →</button>
+  </div>
+</div>
+
+<!-- CLIENT MODAL -->
+<div class="modal-overlay" id="client-modal" style="display:none;" onclick="if(event.target===this)closeClientModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;">
+      <div class="modal-title" id="cm-title">Nuevo cliente</div>
+      <button class="modal-close" onclick="closeClientModal()">✕</button>
+    </div>
+    <input type="hidden" id="cm-id">
+    <div class="form-row">
+      <div class="field-label">Nombre</div>
+      <input class="form-input" type="text" id="cm-name" placeholder="Nombre del cliente…">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Caballo</div>
+      <select class="form-input" id="cm-horse"></select>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Diagnóstico</div>
+      <textarea class="form-input" id="cm-diagnosis" rows="2" placeholder="…" style="resize:vertical;"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Notas</div>
+      <textarea class="form-input" id="cm-notes" rows="2" placeholder="…" style="resize:vertical;"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Tutor / responsable</div>
+      <input class="form-input" id="cm-tutor" type="text" placeholder="Nombre del tutor…">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Teléfono</div>
+      <input class="form-input" id="cm-phone" type="tel" placeholder="809…">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Correo</div>
+      <input class="form-input" id="cm-email" type="email" placeholder="correo@…">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Dirección</div>
+      <input class="form-input" id="cm-address" type="text" placeholder="Dirección…">
+    </div>
+    <div id="cm-history"></div>
+    <button class="btn-primary" onclick="saveClient()" style="margin-top:4px;">Guardar →</button>
+  </div>
+</div>
+
+<!-- DELETE PIN MODAL -->
+<div class="modal-overlay" id="delete-pin-modal" style="display:none;" onclick="if(event.target===this)closeDeletePinModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;">
+      <div class="modal-title" id="delete-pin-title">Eliminar cliente</div>
+      <button class="modal-close" onclick="closeDeletePinModal()">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">Esta acción no se puede deshacer.</div>
+    <div class="form-row">
+      <div class="field-label">Código de confirmación</div>
+      <input class="form-input" id="delete-pin-input" type="password" placeholder="••••" maxlength="4" inputmode="numeric">
+    </div>
+    <div id="delete-pin-error" style="font-size:13px;color:var(--red);display:none;margin-top:-4px;">Código incorrecto</div>
+    <button class="btn-primary" onclick="confirmDeletePin()" style="margin-top:4px;background:var(--red);">Eliminar definitivamente →</button>
+  </div>
+</div>
+
+<!-- EDIT PLAN MODAL -->
+<div class="modal-overlay" id="edit-plan-modal" style="display:none;" onclick="if(event.target===this)closeEditPlanModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;">
+      <div class="modal-title">Editar plan semanal</div>
+      <button class="modal-close" onclick="closeEditPlanModal()">✕</button>
+    </div>
+    <div id="edit-plan-content"></div>
+  </div>
+</div>
+
+<!-- WEEK PLAN TASK MODAL -->
+<div class="modal-overlay" id="wplan-modal" style="display:none;" onclick="if(event.target===this)closeWplanModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;">
+      <div class="modal-title" id="wplan-modal-title">Agregar al plan</div>
+      <button class="modal-close" onclick="closeWplanModal()">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Tipo de tarea</div>
+      <div class="recurrence-row">
+        <button class="rec-opt selected" data-val="existing" onclick="selectWplanType(this)">Existente</button>
+        <button class="rec-opt" data-val="custom" onclick="selectWplanType(this)">Nueva</button>
+      </div>
+    </div>
+    <div id="wplan-existing-section">
+      <div class="form-row">
+        <div class="field-label">Seleccionar tarea</div>
+        <select class="form-input" id="wplan-task-select" style="padding:10px 12px;margin-bottom:0;"></select>
+      </div>
+    </div>
+    <div id="wplan-custom-section" style="display:none;">
+      <div class="form-row">
+        <div class="field-label">Nombre de la tarea</div>
+        <input class="form-input" id="wplan-custom-name" placeholder="Ej: Reparar cerca" type="text">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Hora de inicio</div>
+      <span id="wplan-time-wrap"></span>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Duración (minutos)</div>
+      <input class="form-input" id="wplan-dur" type="number" min="5" max="480" placeholder="Ej: 45">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Nota (opcional)</div>
+      <input class="form-input" id="wplan-note" type="text" placeholder="Instrucciones adicionales…">
+    </div>
+    <button class="btn-primary" onclick="saveWplanTask()" style="margin-top:4px;">Guardar →</button>
+  </div>
+</div>
+
+<!-- HISTORY DRAWER -->
+<div class="modal-overlay" id="history-modal" style="display:none;" onclick="if(event.target===this)closeHistoryModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;margin-bottom:4px;">
+      <div class="modal-title" id="history-modal-title">Historial</div>
+      <button class="modal-close" onclick="closeHistoryModal()">✕</button>
+    </div>
+    <div id="history-modal-content"></div>
+  </div>
+</div>
+
+<!-- ABSENCE OVERRIDE MODAL (colaborador only) -->
+<div class="modal-overlay" id="absence-modal" style="display:none;" onclick="if(event.target===this)closeAbsenceModal()">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;">
+      <div class="modal-title">Marcar ausencia injustificada</div>
+      <button class="modal-close" onclick="closeAbsenceModal()">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">
+      Este día descontará una meta completa del balance. Quedará visible con tu nombre.
+    </div>
+    <input type="hidden" id="ab-user-id">
+    <div class="form-row">
+      <div class="field-label">Persona</div>
+      <div class="form-input" id="ab-user-name" style="background:var(--surface2);"></div>
+    </div>
+    <div class="form-row">
+      <div class="field-label">Fecha</div>
+      <input class="form-input" id="ab-date" type="date">
+    </div>
+    <div class="form-row">
+      <div class="field-label">Nota (opcional)</div>
+      <input class="form-input" id="ab-note" type="text" placeholder="Motivo o comentario…">
+    </div>
+    <button class="btn-primary" onclick="saveAbsence()" style="margin-top:4px;background:var(--red);">Registrar ausencia →</button>
+  </div>
+</div>
+
+<script src="app.js?v=7"></script>
+</body>
+</html>
