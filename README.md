@@ -21,7 +21,7 @@ each login shows a genuinely different application. Password for all accounts:
 | `colaborador` | `ana.admin@vistaverde-demo.com` | Full management view: team, agenda, payroll, admin |
 | `coordinador` | `carmen.coord@vistaverde-demo.com` | Office view: therapy agenda, office tasks, finances |
 | `pesticero` | `luis.pesticero@vistaverde-demo.com` | Daily farm view: own task list, clock-in, overtime balance |
-| `volunteer` | `carlos.voluntario@vistaverde-demo.com` | Volunteer view: task pool, own hours, ES/EN toggle |
+| `volunteer` | `carlos.voluntario@vistaverde-demo.com` | Volunteer view: task pool, own hours |
 
 ## Features
 
@@ -34,7 +34,10 @@ each login shows a genuinely different application. Password for all accounts:
 - **Client records** — public roster separated from private data (diagnosis, tutor,
   contact details) at the database level, enforced by row-level security
 - **Inventory** — stock levels with thresholds and point-in-time snapshots
-- **Bilingual UI** — Spanish throughout, with an English toggle for volunteers
+- **Bilingual UI** — every role can switch the whole interface between Spanish and
+  English; the choice is stored per user in `profiles.language`. Dates and numbers follow
+  the selected language. Data entered by staff (task names, notes, client records) stays
+  in Spanish, except the volunteer task pool, which carries its own English column
 
 ## Tech stack
 

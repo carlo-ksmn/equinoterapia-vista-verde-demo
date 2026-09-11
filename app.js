@@ -149,14 +149,26 @@ function meriendaCreditMins(entries) {
 let currentUser = null, currentProfile = null;
 let clockInterval = null, activeEntry = null;
 
-// UI language. 'es' is the default for everyone; only volunteers can switch to 'en'.
-// Persisted per device/browser via localStorage (browser-only, no Supabase).
+// UI language. 'es' is the default for everyone; every role can switch to 'en'.
+// Persisted per user in profiles.language; localStorage is only a pre-login cache
+// so the login screen can render in the last language used on this device.
 const LANG_STORAGE_KEY = 'vv_lang';
 let currentLang = 'es';
 
+// Number/date locale per UI language. Drives every toLocale* call in the app.
+const LOCALES = { es: 'es-DO', en: 'en-GB' };
+function loc() { return LOCALES[currentLang] || LOCALES.es; }
+
+// Operational terms that stay in Spanish in both languages: "merienda".
+// Role names and finca/oficina DO get translated (see role_* / nav_finca / nav_oficina).
 const T = {
   es: {
+    // ---- roles ----
     role_pesticero: 'Pesticero', role_colaborador: 'Colaborador', role_coordinador: 'Coordinador', role_volunteer: 'Voluntario',
+    group_pesticeros: 'Pesticeros', group_coordinador: 'Coordinador', group_voluntarios: 'Voluntarios',
+    lbl_colaborador_fallback: 'colaborador',
+
+    // ---- generic / shared ----
     touch_worker: 'Toca un trabajador para ver su historial',
     last_30_days: 'Últimos 30 días', loading: 'Cargando…', no_records: 'Sin registros',
     worked: 'trabajados', pending_badge: 'Pendiente', weekly_tasks_label: 'Tareas semanales',
@@ -204,60 +216,472 @@ const T = {
     no_plan: 'Sin tareas planificadas para este día',
     wplan_saved: '✓ Tarea añadida al plan', wplan_deleted: 'Tarea eliminada',
     wplan_confirmed: '✓ Plan confirmado',
-    // Volunteer view (previously hardcoded strings)
     tab_terapias: 'Terapias', tab_tareas: 'Tareas', tab_horario: 'Horario',
     terapias_today: 'Terapias hoy',
     status_confirmed: 'Confirmó', status_cancelled: 'Canceló', status_pending: 'Pendiente',
     prep_mark: 'Marcar como preparado', prep_unmark: 'Preparado — clic para desmarcar',
     pool_title: 'Pool de tareas', last_time: 'última vez:', never: 'nunca', done_btn: 'Hecho',
-  },
 
-  // English — volunteer scope only. Keys not listed here fall back to Spanish via t().
+    // ---- app shell / auth ----
+    app_title: 'Equinoterapia Vista Verde · Gestión',
+    auth_demo_note: 'Demo pública · datos ficticios',
+    lbl_email: 'Correo electrónico', ph_email: 'tu@correo.com',
+    lbl_password: 'Contraseña', btn_login: 'Entrar',
+    err_login: 'Correo o contraseña incorrectos',
+    btn_logout_title: 'Salir', lang_toggle_title: 'Español / English',
+
+    // ---- navigation ----
+    nav_diario: 'Diario', nav_semanal: 'Semanal', nav_balance: 'Balance',
+    nav_operativo: 'Operativo', nav_oficina: 'Oficina', nav_agenda: 'Agenda', nav_admin: 'Admin',
+    nav_voluntarios: 'Voluntarios', nav_finca: 'Finca', nav_ejecutivo: 'Ejecutivo',
+    nav_equipo: 'Equipo', nav_clientes: 'Clientes', nav_finanzas: 'Finanzas',
+    nav_inventario: 'Inventario', nav_exportar: 'Exportar',
+    nav_time: '⏱ Tiempo', nav_balance_money: '💰 Balance',
+    msg_coming_soon: 'Ejecutivo · próximamente',
+
+    // ---- generic labels / buttons ----
+    lbl_date: 'Fecha', lbl_time: 'Hora', lbl_day: 'Día', lbl_type: 'Tipo',
+    lbl_name: 'Nombre', lbl_person: 'Persona', lbl_client: 'Cliente', lbl_horse: 'Caballo',
+    lbl_note_opt: 'Nota (opcional)', lbl_dur: 'Duración (minutos)',
+    lbl_dur_est: 'Duración estimada (minutos)', lbl_start_time: 'Hora de inicio',
+    lbl_task_name: 'Nombre de la tarea', lbl_task_type: 'Tipo de tarea',
+    lbl_select_task: 'Seleccionar tarea', lbl_assign_to: 'Asignar a',
+    lbl_recurrence: 'Repetición', lbl_category: 'Categoría', lbl_quantity: 'Cantidad',
+    lbl_from: 'Desde', lbl_to: 'Hasta', lbl_by: 'por', lbl_saldo: 'Saldo',
+    lbl_total_balance: 'Balance total', lbl_to_recover: 'por recuperar',
+    lbl_inactive: '(inactivo)', lbl_on_merienda: '🍽 Merienda',
+    lbl_see_history_arrow: '— · Ver historial →',
+    lbl_last_time_full: 'Última vez:',
+    lbl_diagnosis: 'Diagnóstico', lbl_notes: 'Notas',
+    lbl_guardian: 'Tutor / responsable', lbl_phone: 'Teléfono',
+    lbl_email_short: 'Correo', lbl_address: 'Dirección',
+    lbl_confirm_code: 'Código de confirmación',
+    btn_save: 'Guardar →', btn_add: 'Agregar →', btn_back: '← Volver',
+    btn_edit_title: 'Editar', btn_delete_title: 'Eliminar',
+    btn_activate: 'Activar', btn_deactivate: 'Desactivar',
+    btn_existing: 'Existente', btn_new: 'Nueva',
+    btn_from_list: 'De la lista', btn_free_name: 'Nombre libre',
+    btn_show_history: '▾ Ver historial', btn_hide: '▴ Ocultar',
+    btn_show_full_history: '▾ Ver historial completo',
+    btn_add_extra_task: '+ Tarea extra', btn_delete_forever: 'Eliminar definitivamente →',
+    btn_save_task: 'Guardar tarea →', btn_save_session: 'Guardar sesión →',
+    btn_rec_once: 'Solo esta vez', btn_rec_daily: 'Cada día',
+    btn_rec_weekly: 'Cada semana', btn_rec_monfri: 'Lun–Vie',
+    btn_type_reposicion: 'Reposición', btn_type_first: 'Primera vez', btn_type_extra: 'Extra',
+    ph_task_name: 'Ej: Limpiar almacén', ph_dur_45: 'Ej: 45',
+    ph_note_extra: 'Instrucciones adicionales…', ph_task_fence: 'Ej: Reparar cerca',
+    ph_client_name: 'Nombre del cliente…', ph_guardian: 'Nombre del tutor…',
+    ph_address: 'Dirección…', ph_reason: 'Motivo o comentario…', ph_email_at: 'correo@…',
+
+    // ---- titles ----
+    ttl_extra_task: 'Nueva tarea extra', ttl_extra_session: 'Sesión extra',
+    ttl_client_new: 'Nuevo cliente', ttl_client_edit: 'Editar cliente',
+    ttl_delete_client: 'Eliminar cliente', ttl_delete_named: 'Eliminar',
+    ttl_edit_week_plan: 'Editar plan semanal', ttl_add_to_plan: 'Agregar al plan',
+    ttl_history: 'Historial', ttl_add_slot: 'Agregar slot', ttl_delete_slot: 'Eliminar slot',
+    ttl_volunteer_tasks: 'Tareas de voluntarios',
+
+    // ---- messages / errors ----
+    msg_irreversible: 'Esta acción no se puede deshacer.',
+    err_wrong_code: 'Código incorrecto',
+    msg_saved: '✓ Guardado', msg_deleted: '✓ Eliminado',
+    msg_task_saved: '✓ Tarea guardada', msg_session_saved: '✓ Sesión guardada',
+    msg_slot_added: '✓ Slot agregado', msg_slot_deleted: '✓ Slot eliminado',
+    msg_merienda_left: '☕ Quedan {n} de 30 min',
+    msg_merienda_done: '☕ 30 min cumplidos · el resto cuenta como trabajo',
+    err_generic: 'Error', err_load: 'Error al cargar.', err_update: 'Error al actualizar',
+    err_delete: 'Error al eliminar', err_rls: '⚠ Sin permiso (RLS)',
+    err_close_shift: 'Error al cerrar el turno', err_punch: 'Error al fichar',
+    err_resume_shift: 'Error al reanudar el turno',
+    err_date_time: '⚠ Completa fecha y hora', err_all_fields: '⚠ Completa todos los campos',
+    err_no_date: 'Falta fecha',
+    empty_no_workdays: 'Sin días trabajados', empty_void: 'Vacío.',
+
+    // ---- week plan ----
+    wp_today: 'HOY', wp_unconfirmed_short: '⚠ Plan pendiente de confirmación',
+    wp_ttl_delete_task: 'Eliminar tarea del plan', wp_ttl_add_task: 'Agregar tarea',
+
+    // ---- agenda / terapias ----
+    ag_btn_add_session: '+ Sesión', ag_btn_edit_plan: '✏️ Editar',
+    ag_board_warning: '⚠ Verificar en la pizarra · ningún caballo más de 3 sesiones hoy',
+    ag_status_confirmo: 'Confirmó', ag_status_cancelo: 'Canceló', ag_status_pendiente: 'Pendiente',
+    ag_attendance_title: 'Asistencia',
+    ag_att_present: '✓ Asistió', ag_att_absent: '✗ Ausente',
+    ag_type_first: '1ª vez', ag_type_repos: 'Repos.', ag_type_extra: 'Extra',
+    ag_sec_morning: 'Mañana', ag_sec_midday: 'Mediodía', ag_sec_afternoon: 'Tarde',
+    ag_empty: 'Sin sesiones planificadas.',
+
+    // ---- clientes ----
+    cli_btn_add: '+ Cliente', cli_empty: 'Sin clientes.',
+    cli_err_linked: '⚠ Cliente vinculado a terapias — desactívalo en su lugar',
+    cli_history_title: 'Historial de sesiones', cli_history_empty: 'Sin sesiones registradas.',
+
+    // ---- absences ----
+    abs_title: 'Marcar ausencia injustificada',
+    abs_warning: 'Este día descontará una meta completa del balance. Quedará visible con tu nombre.',
+    abs_btn_save: 'Registrar ausencia →', abs_btn_mark: '＋ Marcar ausencia injustificada',
+    abs_row_label: 'Ausencia injustificada', abs_recorded_by: 'Registrado por',
+    abs_err_dup: 'Ya existe una ausencia ese día',
+    abs_msg_saved: 'Ausencia registrada', abs_msg_deleted: 'Ausencia eliminada',
+    abs_ttl_delete: 'Eliminar ausencia',
+
+    // ---- finanzas ----
+    fin_title: 'Contabilidad · Alegra',
+    fin_intro: 'Alegra es el sistema oficial de contabilidad de la organización. Los ingresos y gastos se registran allí, no en esta app.',
+    fin_btn_alegra: 'Abrir Alegra →', fin_invoices_title: 'Facturas y recibos (salidas)',
+    fin_flow_intro: 'Flujo para ordenar las facturas del mes con ayuda de Claude:',
+    fin_step_1: 'Guarda las fotos de las facturas en la carpeta de Drive.',
+    fin_step_2: 'Súbelas a tu chat de Claude (Claude Pro).',
+    fin_step_3: 'Pídele una lista ordenada de gastos (fecha, monto, concepto).',
+    fin_step_4: 'Registra los valores en Alegra y guarda la lista en Drive.',
+    fin_btn_drive: 'Abrir carpeta de salidas →',
+
+    // ---- inventario ----
+    inv_last_check: 'Última revisión', inv_no_checks: 'Aún no hay revisiones guardadas.',
+    inv_btn_new_check: '📸 Nueva revisión', inv_btn_gen_text: '💬 Generar texto',
+    inv_btn_history: '🕘 Ver historial', inv_add_title: '+ Artículo',
+    inv_ph_name: 'Nombre (ej: Trigo)', inv_ph_unit: '%/sacos',
+    inv_unit_count: 'N.º', inv_unit_free: 'Libre', inv_unit_free_low: 'libre',
+    inv_ph_min: 'Alerta urgente <', inv_ph_week: 'Alerta semana <',
+    inv_meta_urgent: 'urgente<', inv_meta_week: 'semana<',
+    inv_empty: 'Sin artículos.', inv_cat_other: 'Otros',
+    inv_badge_urgent: '🚨 urgente', inv_badge_week: '⚠️ semana',
+    inv_prompt_note: 'Nota / observaciones (opcional):',
+    inv_err_no_items: '⚠ Sin artículos', inv_err_lines: '⚠ Error al guardar líneas',
+    inv_msg_saved: '📸 Revisión guardada',
+    inv_history_title: 'Historial de revisiones', inv_history_empty: 'Sin revisiones aún.',
+    inv_ttl_delete: 'Eliminar artículo',
+    inv_msg_copied: '💬 Texto copiado', inv_msg_copy_manual: 'Copia manual abajo',
+    inv_wa_title: 'Texto para WhatsApp',
+
+    // ---- WhatsApp stock report ----
+    wa_header: '📦 INVENTARIO GENERAL – EVV', wa_date: 'Fecha', wa_time: 'Hora',
+    wa_by: 'Revisado por', wa_current: '📦 INVENTARIO ACTUAL',
+    wa_alerts: '🚨 ALERTAS DE COMPRA', wa_buy_urgent: 'Comprar urgente',
+    wa_buy_week: 'Comprar esta semana', wa_no_alerts: 'Sin alertas.',
+
+    // ---- exportar ----
+    exp_title: 'Exportar datos (CSV)',
+    exp_intro: 'Elige un rango de fechas, descarga el archivo y súbelo a Google Drive. Se abre directamente en Google Sheets.',
+    exp_btn_tasks: '⬇ Tareas completadas', exp_btn_time: '⬇ Registro de tiempo',
+    exp_btn_agenda: '⬇ Agenda (terapias)', exp_btn_inv: '⬇ Inventario (actual)',
+    exp_btn_inv_hist: '⬇ Inventario (historial de revisiones)',
+    exp_err: 'Error al exportar', exp_err_no_checks: '⚠ Sin revisiones en el rango',
+    exp_msg_tasks: '✓ {n} tareas exportadas', exp_msg_time: '✓ {n} registros exportados',
+    exp_msg_agenda: '✓ {n} sesiones exportadas', exp_msg_inv_hist: '✓ {n} revisiones exportadas',
+    exp_file_tasks: 'tareas', exp_file_time: 'tiempo', exp_file_agenda: 'agenda',
+    exp_file_inv: 'inventario-actual', exp_file_inv_hist: 'inventario-historial',
+    exp_file_range: 'a',
+    exp_h_date: 'Fecha', exp_h_time: 'Hora', exp_h_person: 'Persona', exp_h_task: 'Tarea',
+    exp_h_type: 'Tipo', exp_h_completed: 'Completado', exp_h_in: 'Entrada', exp_h_out: 'Salida',
+    exp_h_dur_min: 'Duración (min)', exp_h_client: 'Cliente', exp_h_horse: 'Caballo',
+    exp_h_status: 'Estado', exp_h_attendance: 'Asistencia', exp_h_emoji: 'Emoji',
+    exp_h_item: 'Artículo', exp_h_category: 'Categoría', exp_h_qty: 'Cantidad',
+    exp_h_unit: 'Unidad', exp_h_alert_urgent: 'Alerta urgente <', exp_h_alert_week: 'Alerta semana <',
+    exp_h_updated: 'Última actualización', exp_h_checked_by: 'Revisado por', exp_h_note: 'Nota',
+    exp_v_open: '(abierto)', exp_v_work: 'Trabajo', exp_v_merienda: 'Merienda',
+    exp_v_buy_urgent: 'Comprar urgente', exp_v_buy_week: 'Comprar esta semana',
+    exp_v_daily: 'Diaria', exp_v_weekly: 'Semanal', exp_v_monthly: 'Mensual',
+    exp_v_extra: 'Extra', exp_v_volunteer: 'Voluntario',
+    exp_v_reposicion: 'Reposición', exp_v_first: 'Primera vez',
+    exp_v_biweekly: 'Quincenal', exp_v_regular: 'Regular', exp_v_ok: 'OK',
+    exp_err_no_range: '⚠ Elige un rango de fechas', exp_err_no_data_range: 'Sin datos en ese rango',
+    exp_err_no_data: '⚠ Sin datos', exp_msg_downloaded: '✓ Descargado',
+    exp_v_present: 'Asistió', exp_v_absent: 'Ausente',
+
+    // ---- units ----
+    unit_min: 'min', unit_h: 'h', unit_m: 'm', unit_per_week: '×/sem',
+    unit_rd: 'RD$', unit_dop_h: 'DOP/h',
+
+    // ---- day / month names (single source for the whole app) ----
+    day_1: 'Lunes', day_2: 'Martes', day_3: 'Miércoles', day_4: 'Jueves',
+    day_5: 'Viernes', day_6: 'Sábado', day_7: 'Domingo',
+    day_short_1: 'Lun', day_short_2: 'Mar', day_short_3: 'Mié', day_short_4: 'Jue',
+    day_short_5: 'Vie', day_short_6: 'Sáb', day_short_7: 'Dom',
+    day_initial_1: 'L', day_initial_2: 'M', day_initial_3: 'X', day_initial_4: 'J',
+    day_initial_5: 'V', day_initial_6: 'S', day_initial_7: 'D',
+    mon_1: 'Enero', mon_2: 'Febrero', mon_3: 'Marzo', mon_4: 'Abril',
+    mon_5: 'Mayo', mon_6: 'Junio', mon_7: 'Julio', mon_8: 'Agosto',
+    mon_9: 'Septiembre', mon_10: 'Octubre', mon_11: 'Noviembre', mon_12: 'Diciembre',
+    mon_short_1: 'ene', mon_short_2: 'feb', mon_short_3: 'mar', mon_short_4: 'abr',
+    mon_short_5: 'may', mon_short_6: 'jun', mon_short_7: 'jul', mon_short_8: 'ago',
+    mon_short_9: 'sep', mon_short_10: 'oct', mon_short_11: 'nov', mon_short_12: 'dic',
+  },
+  // English — full coverage for all four roles.
+  // "merienda" is kept as-is (operational term); roles and finca/oficina are translated.
   en: {
-    role_volunteer: 'Volunteer',
-    loading: 'Loading…',
+    // ---- roles ----
+    role_pesticero: 'Stablehand', role_colaborador: 'Manager', role_coordinador: 'Coordinator', role_volunteer: 'Volunteer',
+    group_pesticeros: 'Stablehands', group_coordinador: 'Coordinator', group_voluntarios: 'Volunteers',
+    lbl_colaborador_fallback: 'manager',
+
+    // ---- generic / shared ----
+    touch_worker: 'Tap a worker to see their history',
+    last_30_days: 'Last 30 days', loading: 'Loading…', no_records: 'No records',
+    worked: 'worked', pending_badge: 'Pending', weekly_tasks_label: 'Weekly tasks',
+    this_week: 'This wk.', period_info: '🔒 Request window: 13–15 and 28 to the last day of the month',
+    type_money: '💵 Cash', type_time: '⏱ Time off',
+    err_name: '⚠ Enter a name', err_person: '⚠ Select at least one person',
+    err_date: '⚠ Select a date', err_save: 'Could not save',
+    rec_once: 'Extra', rec_daily: 'Daily', rec_weekly: 'Weekly', rec_monfri: 'Mon–Fri',
+    biweekly_tasks: 'Fortnightly tasks', monthly_tasks: 'Monthly tasks',
+    weekly_badge: 'Weekly', biweekly_badge: 'Fortnightly', monthly_badge: 'Monthly',
     clock_in: 'Clock in', clock_out: 'Clock out',
-    history: "Today's log",
+    merienda_start: 'Start merienda', merienda_end: 'End merienda',
+    today: 'Today', overtime: 'Overtime',
+    hour_bank: 'Hour bank', history: "Today's log",
     entry_work_in: 'In', entry_work_out: 'Out',
+    entry_merienda_in: 'Merienda start', entry_merienda_out: 'Merienda end',
+    compensation: 'Request compensation',
+    comp_money: 'Extra cash payment', comp_time: 'Time off (leave early)',
+    send_request: 'Send request to the manager', no_bank: 'No hours accrued yet',
+    team_status: 'Team status', pending_requests: 'Pending requests',
+    week_summary: 'Weekly summary', plan_tab: 'Plan',
+    approve: 'Approve', deny: 'Decline',
+    approved: 'Approved ✓', denied: 'Declined',
+    no_pending: 'No pending requests',
+    requests_tab: 'Requests', team_tab: 'Team', week_tab: 'Week',
+    on_shift: 'On shift', off: 'Off', normal_hours: 'On time',
     session_active: 'On shift since', session_none: 'No active shift',
+    break_active: 'On merienda since',
     punched_in: 'Clocked in', punched_out: 'Clocked out',
+    break_started: 'Merienda started', break_ended: 'Merienda ended',
+    break_already: 'Merienda already taken today', break_no_pm: 'Merienda only available in the morning (06:30–12:00)',
+    request_sent: 'Request sent to the manager',
     gps_blocked: '📍 You must be at the farm to clock in',
     gps_checking: 'Checking location…',
-    task_done: '✓ Task completed',
+    daily_plan: "Today's plan", weekly_tasks: 'Weekly tasks',
+    add_today: '+ Today', completed_at: 'done',
+    late_by: 'Late', overtime_dop: 'Cash value',
+    task_done: '✓ Task completed', weekly_added: "Task added to today's plan",
+    comp_locked: '🔒 Requests open 13–15 and 28 to the last day of the month',
+    view_history: 'Show history',
+    week_plan: 'Weekly plan', week_tab_p: 'Week',
+    not_confirmed: '⚠ Plan awaiting confirmation by the manager',
+    confirm_plan: 'Confirm plan', plan_confirmed: '✓ Plan confirmed',
+    add_to_plan: '+ Add', delete_task: 'Delete',
+    no_plan: 'No tasks planned for this day',
+    wplan_saved: '✓ Task added to the plan', wplan_deleted: 'Task deleted',
+    wplan_confirmed: '✓ Plan confirmed',
     tab_terapias: 'Therapies', tab_tareas: 'Tasks', tab_horario: 'Schedule',
     terapias_today: 'Therapies today',
     status_confirmed: 'Confirmed', status_cancelled: 'Cancelled', status_pending: 'Pending',
     prep_mark: 'Mark as prepped', prep_unmark: 'Prepped — click to unmark',
     pool_title: 'Task pool', last_time: 'last time:', never: 'never', done_btn: 'Done',
+
+    // ---- app shell / auth ----
+    app_title: 'Equinoterapia Vista Verde · Management',
+    auth_demo_note: 'Public demo · fictional data',
+    lbl_email: 'Email address', ph_email: 'you@email.com',
+    lbl_password: 'Password', btn_login: 'Sign in',
+    err_login: 'Wrong email or password',
+    btn_logout_title: 'Sign out', lang_toggle_title: 'Español / English',
+
+    // ---- navigation ----
+    nav_diario: 'Daily', nav_semanal: 'Weekly', nav_balance: 'Balance',
+    nav_operativo: 'Operations', nav_oficina: 'Office', nav_agenda: 'Schedule', nav_admin: 'Admin',
+    nav_voluntarios: 'Volunteers', nav_finca: 'Farm', nav_ejecutivo: 'Executive',
+    nav_equipo: 'Team', nav_clientes: 'Clients', nav_finanzas: 'Finance',
+    nav_inventario: 'Inventory', nav_exportar: 'Export',
+    nav_time: '⏱ Time', nav_balance_money: '💰 Balance',
+    msg_coming_soon: 'Executive · coming soon',
+
+    // ---- generic labels / buttons ----
+    lbl_date: 'Date', lbl_time: 'Time', lbl_day: 'Day', lbl_type: 'Type',
+    lbl_name: 'Name', lbl_person: 'Person', lbl_client: 'Client', lbl_horse: 'Horse',
+    lbl_note_opt: 'Note (optional)', lbl_dur: 'Duration (minutes)',
+    lbl_dur_est: 'Estimated duration (minutes)', lbl_start_time: 'Start time',
+    lbl_task_name: 'Task name', lbl_task_type: 'Task type',
+    lbl_select_task: 'Select task', lbl_assign_to: 'Assign to',
+    lbl_recurrence: 'Repeat', lbl_category: 'Category', lbl_quantity: 'Quantity',
+    lbl_from: 'From', lbl_to: 'To', lbl_by: 'by', lbl_saldo: 'Balance',
+    lbl_total_balance: 'Total balance', lbl_to_recover: 'to make up',
+    lbl_inactive: '(inactive)', lbl_on_merienda: '🍽 Merienda',
+    lbl_see_history_arrow: '— · Show history →',
+    lbl_last_time_full: 'Last time:',
+    lbl_diagnosis: 'Diagnosis', lbl_notes: 'Notes',
+    lbl_guardian: 'Guardian / carer', lbl_phone: 'Phone',
+    lbl_email_short: 'Email', lbl_address: 'Address',
+    lbl_confirm_code: 'Confirmation code',
+    btn_save: 'Save →', btn_add: 'Add →', btn_back: '← Back',
+    btn_edit_title: 'Edit', btn_delete_title: 'Delete',
+    btn_activate: 'Activate', btn_deactivate: 'Deactivate',
+    btn_existing: 'Existing', btn_new: 'New',
+    btn_from_list: 'From list', btn_free_name: 'Free text',
+    btn_show_history: '▾ Show history', btn_hide: '▴ Hide',
+    btn_show_full_history: '▾ Show full history',
+    btn_add_extra_task: '+ Extra task', btn_delete_forever: 'Delete permanently →',
+    btn_save_task: 'Save task →', btn_save_session: 'Save session →',
+    btn_rec_once: 'This once', btn_rec_daily: 'Every day',
+    btn_rec_weekly: 'Every week', btn_rec_monfri: 'Mon–Fri',
+    btn_type_reposicion: 'Make-up', btn_type_first: 'First visit', btn_type_extra: 'Extra',
+    ph_task_name: 'E.g. Clean the storeroom', ph_dur_45: 'E.g. 45',
+    ph_note_extra: 'Additional instructions…', ph_task_fence: 'E.g. Repair fence',
+    ph_client_name: 'Client name…', ph_guardian: 'Guardian name…',
+    ph_address: 'Address…', ph_reason: 'Reason or comment…', ph_email_at: 'email@…',
+
+    // ---- titles ----
+    ttl_extra_task: 'New extra task', ttl_extra_session: 'Extra session',
+    ttl_client_new: 'New client', ttl_client_edit: 'Edit client',
+    ttl_delete_client: 'Delete client', ttl_delete_named: 'Delete',
+    ttl_edit_week_plan: 'Edit weekly plan', ttl_add_to_plan: 'Add to plan',
+    ttl_history: 'History', ttl_add_slot: 'Add slot', ttl_delete_slot: 'Delete slot',
+    ttl_volunteer_tasks: 'Volunteer tasks',
+
+    // ---- messages / errors ----
+    msg_irreversible: 'This action cannot be undone.',
+    err_wrong_code: 'Wrong code',
+    msg_saved: '✓ Saved', msg_deleted: '✓ Deleted',
+    msg_task_saved: '✓ Task saved', msg_session_saved: '✓ Session saved',
+    msg_slot_added: '✓ Slot added', msg_slot_deleted: '✓ Slot deleted',
+    msg_merienda_left: '☕ {n} of 30 min left',
+    msg_merienda_done: '☕ 30 min used · the rest counts as work',
+    err_generic: 'Error', err_load: 'Could not load.', err_update: 'Could not update',
+    err_delete: 'Could not delete', err_rls: '⚠ Not permitted (RLS)',
+    err_close_shift: 'Could not close the shift', err_punch: 'Could not clock in or out',
+    err_resume_shift: 'Could not resume the shift',
+    err_date_time: '⚠ Fill in date and time', err_all_fields: '⚠ Fill in all fields',
+    err_no_date: 'Date missing',
+    empty_no_workdays: 'No days worked', empty_void: 'Empty.',
+
+    // ---- week plan ----
+    wp_today: 'TODAY', wp_unconfirmed_short: '⚠ Plan awaiting confirmation',
+    wp_ttl_delete_task: 'Delete task from plan', wp_ttl_add_task: 'Add task',
+
+    // ---- agenda / terapias ----
+    ag_btn_add_session: '+ Session', ag_btn_edit_plan: '✏️ Edit',
+    ag_board_warning: '⚠ Check the board · no horse over 3 sessions today',
+    ag_status_confirmo: 'Confirmed', ag_status_cancelo: 'Cancelled', ag_status_pendiente: 'Pending',
+    ag_attendance_title: 'Attendance',
+    ag_att_present: '✓ Attended', ag_att_absent: '✗ Absent',
+    ag_type_first: '1st visit', ag_type_repos: 'Make-up', ag_type_extra: 'Extra',
+    ag_sec_morning: 'Morning', ag_sec_midday: 'Midday', ag_sec_afternoon: 'Afternoon',
+    ag_empty: 'No sessions scheduled.',
+
+    // ---- clientes ----
+    cli_btn_add: '+ Client', cli_empty: 'No clients.',
+    cli_err_linked: '⚠ Client linked to therapies — deactivate instead',
+    cli_history_title: 'Session history', cli_history_empty: 'No sessions recorded.',
+
+    // ---- absences ----
+    abs_title: 'Record unexcused absence',
+    abs_warning: 'This day deducts a full target from the balance. It stays visible under your name.',
+    abs_btn_save: 'Record absence →', abs_btn_mark: '＋ Record unexcused absence',
+    abs_row_label: 'Unexcused absence', abs_recorded_by: 'Recorded by',
+    abs_err_dup: 'An absence already exists for that day',
+    abs_msg_saved: 'Absence recorded', abs_msg_deleted: 'Absence deleted',
+    abs_ttl_delete: 'Delete absence',
+
+    // ---- finanzas ----
+    fin_title: 'Accounting · Alegra',
+    fin_intro: "Alegra is the organisation's official accounting system. Income and expenses are recorded there, not in this app.",
+    fin_btn_alegra: 'Open Alegra →', fin_invoices_title: 'Invoices and receipts (outgoing)',
+    fin_flow_intro: "Workflow for sorting the month's invoices with Claude:",
+    fin_step_1: 'Save the invoice photos in the Drive folder.',
+    fin_step_2: 'Upload them to your Claude chat (Claude Pro).',
+    fin_step_3: 'Ask for a sorted expense list (date, amount, description).',
+    fin_step_4: 'Enter the values in Alegra and save the list to Drive.',
+    fin_btn_drive: 'Open outgoing folder →',
+
+    // ---- inventario ----
+    inv_last_check: 'Last check', inv_no_checks: 'No checks saved yet.',
+    inv_btn_new_check: '📸 New check', inv_btn_gen_text: '💬 Generate text',
+    inv_btn_history: '🕘 Show history', inv_add_title: '+ Item',
+    inv_ph_name: 'Name (e.g. Wheat)', inv_ph_unit: '%/sacks',
+    inv_unit_count: 'No.', inv_unit_free: 'Free', inv_unit_free_low: 'free',
+    inv_ph_min: 'Urgent alert <', inv_ph_week: 'Weekly alert <',
+    inv_meta_urgent: 'urgent<', inv_meta_week: 'weekly<',
+    inv_empty: 'No items.', inv_cat_other: 'Other',
+    inv_badge_urgent: '🚨 urgent', inv_badge_week: '⚠️ this week',
+    inv_prompt_note: 'Note / remarks (optional):',
+    inv_err_no_items: '⚠ No items', inv_err_lines: '⚠ Could not save lines',
+    inv_msg_saved: '📸 Check saved',
+    inv_history_title: 'Check history', inv_history_empty: 'No checks yet.',
+    inv_ttl_delete: 'Delete item',
+    inv_msg_copied: '💬 Text copied', inv_msg_copy_manual: 'Copy manually below',
+    inv_wa_title: 'Text for WhatsApp',
+
+    // ---- WhatsApp stock report ----
+    wa_header: '📦 GENERAL STOCK – EVV', wa_date: 'Date', wa_time: 'Time',
+    wa_by: 'Checked by', wa_current: '📦 CURRENT STOCK',
+    wa_alerts: '🚨 PURCHASE ALERTS', wa_buy_urgent: 'Buy urgently',
+    wa_buy_week: 'Buy this week', wa_no_alerts: 'No alerts.',
+
+    // ---- exportar ----
+    exp_title: 'Export data (CSV)',
+    exp_intro: 'Pick a date range, download the file and upload it to Google Drive. It opens directly in Google Sheets.',
+    exp_btn_tasks: '⬇ Completed tasks', exp_btn_time: '⬇ Time log',
+    exp_btn_agenda: '⬇ Schedule (therapies)', exp_btn_inv: '⬇ Inventory (current)',
+    exp_btn_inv_hist: '⬇ Inventory (check history)',
+    exp_err: 'Could not export', exp_err_no_checks: '⚠ No checks in range',
+    exp_msg_tasks: '✓ {n} tasks exported', exp_msg_time: '✓ {n} records exported',
+    exp_msg_agenda: '✓ {n} sessions exported', exp_msg_inv_hist: '✓ {n} checks exported',
+    exp_file_tasks: 'tasks', exp_file_time: 'time', exp_file_agenda: 'schedule',
+    exp_file_inv: 'inventory-current', exp_file_inv_hist: 'inventory-history',
+    exp_file_range: 'to',
+    exp_h_date: 'Date', exp_h_time: 'Time', exp_h_person: 'Person', exp_h_task: 'Task',
+    exp_h_type: 'Type', exp_h_completed: 'Completed', exp_h_in: 'In', exp_h_out: 'Out',
+    exp_h_dur_min: 'Duration (min)', exp_h_client: 'Client', exp_h_horse: 'Horse',
+    exp_h_status: 'Status', exp_h_attendance: 'Attendance', exp_h_emoji: 'Emoji',
+    exp_h_item: 'Item', exp_h_category: 'Category', exp_h_qty: 'Quantity',
+    exp_h_unit: 'Unit', exp_h_alert_urgent: 'Urgent alert <', exp_h_alert_week: 'Weekly alert <',
+    exp_h_updated: 'Last updated', exp_h_checked_by: 'Checked by', exp_h_note: 'Note',
+    exp_v_open: '(open)', exp_v_work: 'Work', exp_v_merienda: 'Merienda',
+    exp_v_buy_urgent: 'Buy urgently', exp_v_buy_week: 'Buy this week',
+    exp_v_daily: 'Daily', exp_v_weekly: 'Weekly', exp_v_monthly: 'Monthly',
+    exp_v_extra: 'Extra', exp_v_volunteer: 'Volunteer',
+    exp_v_reposicion: 'Make-up', exp_v_first: 'First visit',
+    exp_v_biweekly: 'Fortnightly', exp_v_regular: 'Regular', exp_v_ok: 'OK',
+    exp_err_no_range: '⚠ Pick a date range', exp_err_no_data_range: 'No data in that range',
+    exp_err_no_data: '⚠ No data', exp_msg_downloaded: '✓ Downloaded',
+    exp_v_present: 'Attended', exp_v_absent: 'Absent',
+
+    // ---- units ----
+    unit_min: 'min', unit_h: 'h', unit_m: 'm', unit_per_week: '×/wk',
+    unit_rd: 'RD$', unit_dop_h: 'DOP/h',
+
+    // ---- day / month names ----
+    day_1: 'Monday', day_2: 'Tuesday', day_3: 'Wednesday', day_4: 'Thursday',
+    day_5: 'Friday', day_6: 'Saturday', day_7: 'Sunday',
+    day_short_1: 'Mon', day_short_2: 'Tue', day_short_3: 'Wed', day_short_4: 'Thu',
+    day_short_5: 'Fri', day_short_6: 'Sat', day_short_7: 'Sun',
+    day_initial_1: 'M', day_initial_2: 'T', day_initial_3: 'W', day_initial_4: 'T',
+    day_initial_5: 'F', day_initial_6: 'S', day_initial_7: 'S',
+    mon_1: 'January', mon_2: 'February', mon_3: 'March', mon_4: 'April',
+    mon_5: 'May', mon_6: 'June', mon_7: 'July', mon_8: 'August',
+    mon_9: 'September', mon_10: 'October', mon_11: 'November', mon_12: 'December',
+    mon_short_1: 'Jan', mon_short_2: 'Feb', mon_short_3: 'Mar', mon_short_4: 'Apr',
+    mon_short_5: 'May', mon_short_6: 'Jun', mon_short_7: 'Jul', mon_short_8: 'Aug',
+    mon_short_9: 'Sep', mon_short_10: 'Oct', mon_short_11: 'Nov', mon_short_12: 'Dec',
   },
 };
 
 // Translation lookup: current language -> Spanish fallback -> raw key.
-// Non-volunteers always have currentLang === 'es', so their views never change.
-function t(key) { return T[currentLang]?.[key] ?? T['es']?.[key] ?? key; }
+// vars: optional {n: 5} replacing {n} placeholders in the string.
+function t(key, vars) {
+  let s = T[currentLang]?.[key] ?? T['es']?.[key] ?? key;
+  if (vars) for (const k in vars) s = s.split('{'+k+'}').join(vars[k]);
+  return s;
+}
+// Day/month names — one source for every view. dow: 1=Mon … 7=Sun.
+function dayName(dow)        { return t('day_'+dow); }
+function dayNameShort(dow)   { return t('day_short_'+dow); }
+function dayInitial(dow)     { return t('day_initial_'+dow); }
+function monthName(m0)       { return t('mon_'+(m0+1)); }       // m0: 0-11
+function monthNameShort(m0)  { return t('mon_short_'+(m0+1)); } // m0: 0-11
+// JS getDay() (0=Sun) -> ISO dow (1=Mon … 7=Sun)
+function isoDow(jsDay) { return jsDay === 0 ? 7 : jsDay; }
+
 function pad(n) { return String(n).padStart(2,'0'); }
 function fmtTime(date) { if (!date) return '—'; const d = new Date(date); const h=d.getHours(); const m=d.getMinutes(); const ampm=h>=12?'pm':'am'; const h12=h%12||12; return h12+':'+(m<10?'0'+m:m)+ampm; }
 function fmtTimeSlot(timeStr) { if(!timeStr) return '—'; const [h,m]=timeStr.slice(0,5).split(':').map(Number); const ampm=h>=12?'pm':'am'; const h12=h%12||12; return h12+':'+(m<10?'0'+m:m)+ampm; }
-function fmtDuration(minutes) { const h = Math.floor(Math.abs(minutes)/60); const m = Math.abs(minutes)%60; return (minutes<0?'-':'')+h+'h '+pad(m)+'m'; }
+function fmtDuration(minutes) { const h = Math.floor(Math.abs(minutes)/60); const m = Math.abs(minutes)%60; return (minutes<0?'-':'')+h+t('unit_h')+' '+pad(m)+t('unit_m'); }
 function fmtDate(d) {
-  // Day/month names follow the UI language (English only ever active for volunteers)
-  const days = currentLang==='en'
-    ? ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-    : ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const months = currentLang==='en'
-    ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    : ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return days[d.getDay()]+', '+d.getDate()+' '+months[d.getMonth()];
+  return dayName(isoDow(d.getDay()))+', '+d.getDate()+' '+monthNameShort(d.getMonth());
 }
 function fmtDateShort(str) {
   const d = new Date(str+'T12:00:00');
-  const days = currentLang==='en'
-    ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-    : ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  const months = currentLang==='en'
-    ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    : ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()];
+  return dayNameShort(isoDow(d.getDay()))+' '+d.getDate()+' '+monthNameShort(d.getMonth());
 }
 function showToast(msg) { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
 function todayStr() { const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
@@ -277,52 +701,84 @@ async function login() {
   const err=document.getElementById('auth-error');
   err.style.display='none'; btn.innerHTML='<div class="spinner"></div>'; btn.disabled=true;
   const {data,error}=await sb.auth.signInWithPassword({email,password:pw});
-  if(error){ err.textContent='Correo o contraseña incorrectos'; err.style.display='block'; btn.textContent='Entrar'; btn.disabled=false; return; }
+  if(error){ err.textContent=t('err_login'); err.style.display='block'; btn.textContent=t('btn_login'); btn.disabled=false; return; }
   await initApp(data.user);
 }
-async function logout() { await sb.auth.signOut(); clearInterval(clockInterval); document.getElementById('auth-screen').style.display='flex'; document.getElementById('app-screen').style.display='none'; document.getElementById('auth-password').value=''; const btn=document.getElementById('login-btn'); btn.textContent='Entrar'; btn.disabled=false; }
+async function logout() { await sb.auth.signOut(); clearInterval(clockInterval); document.getElementById('auth-screen').style.display='flex'; document.getElementById('app-screen').style.display='none'; document.getElementById('auth-password').value=''; const btn=document.getElementById('login-btn'); btn.textContent=t('btn_login'); btn.disabled=false; }
 
 // INIT
 async function initApp(user) {
   currentUser=user;
   const {data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
   currentProfile=profile;
-  // Safety latch: language always resets to 'es' on login.
-  // English is only restored for volunteers who previously chose it on this device.
-  currentLang=(profile.role==='volunteer' && localStorage.getItem(LANG_STORAGE_KEY)==='en')?'en':'es';
+  // Language comes from the user's own profile (profiles.language, default 'es').
+  // localStorage is only a pre-login cache for the auth screen and a fallback
+  // when the column is empty. Available to every role.
+  currentLang=(profile.language==='en'||profile.language==='es')
+    ? profile.language
+    : (localStorage.getItem(LANG_STORAGE_KEY)==='en' ? 'en' : 'es');
+  localStorage.setItem(LANG_STORAGE_KEY,currentLang);
+  applyStaticI18n();
   updateLangToggle();
   await loadCatalogs();
   document.getElementById('top-name').textContent=profile.name||user.email;
   document.getElementById('top-role').textContent=t('role_'+profile.role);
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='flex';
-  if(profile.role==='pesticero') renderPesticero(); else if(profile.role==='volunteer') renderVolunteer(); else renderColaborador();
+  renderCurrentRole();
 }
 
-// LANGUAGE TOGGLE (volunteers only)
-// Creates or removes the 🇪🇸/🇬🇧 button in the topbar depending on role.
+// Renders the view belonging to the logged-in role. Used on login and after a
+// language switch, so every role re-renders with the new strings.
+function renderCurrentRole() {
+  const role=currentProfile?.role;
+  if(role==='pesticero') return renderPesticero();
+  if(role==='volunteer') return renderVolunteer();
+  // coordinador shares the colaborador shell (Oficina · Agenda · Admin);
+  // colaboradorTab() picks the oficina view for that role.
+  return renderColaborador();
+}
+
+// Applies translations to the static markup in index.html.
+// data-i18n -> textContent · data-i18n-ph -> placeholder · data-i18n-title -> title
+function applyStaticI18n() {
+  document.documentElement.lang=currentLang;
+  document.title=t('app_title');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.placeholder=t(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title=t(el.dataset.i18nTitle); });
+}
+
+// LANGUAGE TOGGLE — available to every role.
+// Creates or updates the 🇪🇸/🇬🇧 button in the topbar.
 // The button shows the flag of the language you would SWITCH TO.
 function updateLangToggle() {
   const existing=document.getElementById('lang-toggle');
-  if(currentProfile?.role!=='volunteer'){ if(existing) existing.remove(); return; }
-  if(existing){ existing.textContent=currentLang==='es'?'🇬🇧':'🇪🇸'; return; }
+  if(existing){ existing.textContent=currentLang==='es'?'🇬🇧':'🇪🇸'; existing.title=t('lang_toggle_title'); return; }
   const logoutBtn=document.querySelector('.logout-btn');
   if(!logoutBtn) return;
   const btn=document.createElement('button');
   btn.id='lang-toggle';
   btn.className='logout-btn';
-  btn.title='Español / English';
+  btn.title=t('lang_toggle_title');
   btn.textContent=currentLang==='es'?'🇬🇧':'🇪🇸';
   btn.onclick=toggleLang;
   logoutBtn.parentElement.insertBefore(btn,logoutBtn);
 }
 
-function toggleLang() {
+async function toggleLang() {
   currentLang=currentLang==='es'?'en':'es';
   localStorage.setItem(LANG_STORAGE_KEY,currentLang);
+  applyStaticI18n();
   updateLangToggle();
   document.getElementById('top-role').textContent=t('role_'+currentProfile.role);
-  renderVolunteer();
+  renderCurrentRole();
+  // Persist per user. RLS (profiles_update) allows id = auth.uid().
+  if(currentUser?.id){
+    const {error}=await sb.from('profiles').update({language:currentLang}).eq('id',currentUser.id);
+    if(error) console.error('language not saved',error);
+    else if(currentProfile) currentProfile.language=currentLang;
+  }
 }
 
 function startClock(elId) { clearInterval(clockInterval); function update(){ const now=new Date(); const el=document.getElementById(elId); if(el) el.textContent=pad(now.getHours())+':'+pad(now.getMinutes()); } update(); clockInterval=setInterval(update,60000); }
@@ -331,7 +787,7 @@ function startClock(elId) { clearInterval(clockInterval); function update(){ con
 // PESTICERO VIEW — 3 tabs: Diario · Semanal · Balance
 async function renderPesticero() {
   const content=document.getElementById('main-content');
-  content.innerHTML=`<div class="tab-bar"><button class="tab active" onclick="pesticeroTab('diario')" id="ptab-diario">Diario</button><button class="tab" onclick="pesticeroTab('semanal')" id="ptab-semanal">Semanal</button><button class="tab" onclick="pesticeroTab('balance')" id="ptab-balance">Balance</button></div><div class="tab-content active" id="pest-diario"><div class="card"><div class="clock-display" id="main-clock">--:--</div><div class="clock-date" id="main-date"></div><div class="gps-banner" id="gps-banner"></div><div class="session-info" id="session-info"></div><div id="punch-buttons"></div></div><div class="metric-grid" id="metrics" style="margin-bottom:12px;"></div><div id="terapias-hoy-card" style="margin-bottom:12px;"></div><div class="card" id="plan-card"></div><div class="card" id="history-card"></div></div><div class="tab-content" id="pest-semanal"></div><div class="tab-content" id="pest-balance"></div>`;
+  content.innerHTML=`<div class="tab-bar"><button class="tab active" onclick="pesticeroTab('diario')" id="ptab-diario">${t('nav_diario')}</button><button class="tab" onclick="pesticeroTab('semanal')" id="ptab-semanal">${t('nav_semanal')}</button><button class="tab" onclick="pesticeroTab('balance')" id="ptab-balance">${t('nav_balance')}</button></div><div class="tab-content active" id="pest-diario"><div class="card"><div class="clock-display" id="main-clock">--:--</div><div class="clock-date" id="main-date"></div><div class="gps-banner" id="gps-banner"></div><div class="session-info" id="session-info"></div><div id="punch-buttons"></div></div><div class="metric-grid" id="metrics" style="margin-bottom:12px;"></div><div id="terapias-hoy-card" style="margin-bottom:12px;"></div><div class="card" id="plan-card"></div><div class="card" id="history-card"></div></div><div class="tab-content" id="pest-semanal"></div><div class="tab-content" id="pest-balance"></div>`;
   document.getElementById('main-date').textContent=fmtDate(new Date());
   startClock('main-clock');
   await refreshPesticeroState();
@@ -376,10 +832,10 @@ async function refreshPesticeroState() {
     // Display-only countdown; the actual accounting is handled by meriendaCreditMins
     const merElapsed=Math.floor((new Date()-new Date(activeEntry.clock_in))/60000);
     const merRemaining=Math.max(0,30-merElapsed);
-    const merInfo=merRemaining>0?`☕ Quedan ${merRemaining} de 30 min`:'☕ 30 min cumplidos · el resto cuenta como trabajo';
+    const merInfo=merRemaining>0?t('msg_merienda_left',{n:merRemaining}):t('msg_merienda_done');
     btns.innerHTML=`<div id="mer-remaining" style="text-align:center;font-size:12px;color:var(--text3);margin-bottom:8px;">${merInfo}</div><button class="punch-btn break-end" onclick="punchOut()">${t('merienda_end')}</button>`;
     clearInterval(window.merTick);
-    window.merTick=setInterval(()=>{ const el=document.getElementById('mer-remaining'); if(!el||!activeEntry||activeEntry.entry_type!=='merienda'){ clearInterval(window.merTick); return; } const em=Math.floor((new Date()-new Date(activeEntry.clock_in))/60000); const rm=Math.max(0,30-em); el.textContent=rm>0?`☕ Quedan ${rm} de 30 min`:'☕ 30 min cumplidos · el resto cuenta como trabajo'; },30000);
+    window.merTick=setInterval(()=>{ const el=document.getElementById('mer-remaining'); if(!el||!activeEntry||activeEntry.entry_type!=='merienda'){ clearInterval(window.merTick); return; } const em=Math.floor((new Date()-new Date(activeEntry.clock_in))/60000); const rm=Math.max(0,30-em); el.textContent=rm>0?t('msg_merienda_left',{n:rm}):t('msg_merienda_done'); },30000);
   }
   document.getElementById('metrics').innerHTML=`<div class="metric"><div class="metric-label">${t('today')}</div><div class="metric-val neutral">${fmtDuration(workedMins)}</div></div><div class="metric"><div class="metric-label">${t('overtime')}</div><div class="metric-val ${overtimeMins>0?'positive':'neutral'}">${overtimeMins>0?'+':''}${fmtDuration(overtimeMins)}</div></div>`;
   await renderTerapiasHoy();
@@ -491,8 +947,8 @@ async function renderDailyPlan() {
   const {data:extraCompletions}=await sb.from('task_completions').select('*').eq('user_id',currentUser.id).eq('date',today).eq('task_type','extra');
   const extraDoneMap={}; (extraCompletions||[]).forEach(c=>{extraDoneMap[c.task_id]=c.completed_at;});
   let html=`<div class="card-title">${t('daily_plan')}</div>`; const now=new Date();
-  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=task.name; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+'min '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+'min</div>'+statusHtml+'</div></div>'; });
-  extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const ck2=isDone?'':'completeTask(\''+task.id+'\',\'extra\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck2+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+task.name+'<span class="extra-badge">Extra</span></div><div class="task-target">'+(task.duration_mins?task.duration_mins+'min':'—')+(task.note?' · '+task.note:'')+'</div>'+(isDone?'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(extraDoneMap[task.id])+'</div>':'')+'</div></div>'; });
+  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=task.name; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+t('unit_min')+' '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+t('unit_min')+'</div>'+statusHtml+'</div></div>'; });
+  extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const ck2=isDone?'':'completeTask(\''+task.id+'\',\'extra\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck2+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+task.name+'<span class="extra-badge">'+t('rec_once')+'</span></div><div class="task-target">'+(task.duration_mins?task.duration_mins+t('unit_min'):'—')+(task.note?' · '+task.note:'')+'</div>'+(isDone?'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(extraDoneMap[task.id])+'</div>':'')+'</div></div>'; });
   document.getElementById('plan-card').innerHTML=html;
 }
 
@@ -505,7 +961,7 @@ async function renderOficinaDailyPlan() {
   const doneMap={}; (completions||[]).forEach(c=>{doneMap[c.task_id]=c.completed_at;});
   let html=`<div class="card-title">${t('daily_plan')}</div>`; const now=new Date();
   if(tasks.length===0){ html+=`<div class="empty">—</div>`; }
-  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=task.name; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+'min '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+'min</div>'+statusHtml+'</div></div>'; });
+  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=task.name; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+t('unit_min')+' '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+t('unit_min')+'</div>'+statusHtml+'</div></div>'; });
   el.innerHTML=html;
 }
 
@@ -532,7 +988,7 @@ async function completeTaskOnDate(taskId,taskType,date) {
 async function renderPesticeroSemanal() {
   const el=document.getElementById('pest-semanal');
   if(!el) return;
-  el.innerHTML='<div class="empty">Cargando…</div>';
+  el.innerHTML=`<div class="empty">${t('loading')}</div>`;
 
   // Gather data
   const today=todayStr();
@@ -579,8 +1035,8 @@ async function renderPesticeroSemanal() {
     const dimDone=satisfied&&!onToday;
     const doneBy=weekDoneByMap[task.id]||[];
     const byHtml=doneBy.length&&!isDoneToday?' · <span style="color:var(--green);font-size:10px;">'+doneBy.map(d=>d.name+' '+fmtTime(d.time)).join(', ')+'</span>':'';
-    const freqLabel=task.freq>1?(doneCount+'/'+task.freq+'×/sem'):(satisfied?'✓':(onToday?t('today'):t('this_week')));
-    const durLabel=task.dur>=60?Math.floor(task.dur/60)+'h'+(task.dur%60?pad(task.dur%60)+'m':''):task.dur+'min';
+    const freqLabel=task.freq>1?(doneCount+'/'+task.freq+t('unit_per_week')):(satisfied?'✓':(onToday?t('today'):t('this_week')));
+    const durLabel=task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min');
     html+=recurringRowHTML({name:task.name,cadence:'weekly',meta:`${durLabel} · ${freqLabel}${byHtml}`,isDone:isDoneToday||dimDone,rightHTML:recurringRightHTML(task.id,'weekly',onToday,isDoneToday,dimDone)});
   });
   html+=`</div>`;
@@ -592,7 +1048,7 @@ async function renderPesticeroSemanal() {
     const onToday=myBiTodayIds.has(task.id); const isDoneToday=!!myBiDoneMap[task.id];
     const dimDone=satisfied&&!onToday;
     const byHtml=doneBy.length&&!isDoneToday?' · <span style="color:var(--green);font-size:10px;">'+doneBy.map(d=>d.name+' '+fmtTime(d.time)).join(', ')+'</span>':'';
-    html+=recurringRowHTML({name:task.name,cadence:'biweekly',meta:`${task.dur}min${byHtml}`,isDone:isDoneToday||dimDone,rightHTML:recurringRightHTML(task.id,'biweekly',onToday,isDoneToday,dimDone)});
+    html+=recurringRowHTML({name:task.name,cadence:'biweekly',meta:`${task.dur}${t('unit_min')}${byHtml}`,isDone:isDoneToday||dimDone,rightHTML:recurringRightHTML(task.id,'biweekly',onToday,isDoneToday,dimDone)});
   });
   html+=`</div>`;
 
@@ -603,7 +1059,7 @@ async function renderPesticeroSemanal() {
       const satisfied=!!monthlyDoneMap[task.id]; const onToday=myMonthTodayIds.has(task.id);
       const dimDone=satisfied&&!onToday;
       const doneTimeHtml=satisfied?' · <span style="color:var(--green);font-size:10px;">'+fmtTime(monthlyDoneMap[task.id])+'</span>':'';
-      html+=recurringRowHTML({name:task.name,cadence:'monthly',meta:`${task.dur}min${doneTimeHtml}`,isDone:satisfied,rightHTML:recurringRightHTML(task.id,'monthly',onToday,satisfied,dimDone)});
+      html+=recurringRowHTML({name:task.name,cadence:'monthly',meta:`${task.dur}${t('unit_min')}${doneTimeHtml}`,isDone:satisfied,rightHTML:recurringRightHTML(task.id,'monthly',onToday,satisfied,dimDone)});
     });
     html+=`</div>`;
   }
@@ -624,7 +1080,7 @@ async function addTaskOnDate(taskId, taskType, date, btn) {
 async function renderPesticeroBalance() {
   const el=document.getElementById('pest-balance');
   if(!el) return;
-  el.innerHTML='<div class="empty">Cargando…</div>';
+  el.innerHTML=`<div class="empty">${t('loading')}</div>`;
   const {data:allEntries}=await sb.from('time_entries').select('*').eq('user_id',currentUser.id);
   const {data:approved}=await sb.from('compensation_requests').select('*').eq('user_id',currentUser.id).eq('status','approved');
   const compEl=document.createElement('div');
@@ -643,14 +1099,14 @@ async function punchIn(type) {
     const { data: closed, error: closeErr } = await sb.from('time_entries')
       .update({ clock_out: new Date().toISOString() })
       .eq('id', activeEntry.id).select();
-    if (closeErr || !closed?.length) { showToast('Error al cerrar el turno'); return; }
+    if (closeErr || !closed?.length) { showToast(t('err_close_shift')); return; }
     activeEntry = null;
   }
   const { data: opened, error } = await sb.from('time_entries')
     .insert({ user_id: currentUser.id, clock_in: new Date().toISOString(), entry_type: type })
     .select();
   if (!error && opened?.length) { showToast(type === 'merienda' ? t('break_started') : t('punched_in')); await refreshAfterPunch(); }
-  else { showToast('Error al fichar'); }
+  else { showToast(t('err_punch')); }
 }
 async function punchOut() {
   if (!activeEntry) return;
@@ -658,14 +1114,14 @@ async function punchOut() {
   const { data: closed, error } = await sb.from('time_entries')
     .update({ clock_out: new Date().toISOString() })
     .eq('id', activeEntry.id).select();
-  if (error || !closed?.length) { showToast('Error al fichar'); return; }
+  if (error || !closed?.length) { showToast(t('err_punch')); return; }
   activeEntry = null;
   if (wasMerienda) {
     // Ending a merienda automatically resumes work with a fresh work entry
     const { data: opened, error: openErr } = await sb.from('time_entries')
       .insert({ user_id: currentUser.id, clock_in: new Date().toISOString(), entry_type: 'work' })
       .select();
-    if (openErr || !opened?.length) { showToast('Error al reanudar el turno'); return; }
+    if (openErr || !opened?.length) { showToast(t('err_resume_shift')); return; }
     showToast(t('break_ended'));
   } else {
     showToast(t('punched_out'));
@@ -727,25 +1183,25 @@ async function renderWorkerCompensation(userId, profile, allEntries, approved, c
   const balanceColor=bankMins>0?'var(--green)':bankMins<0?'var(--red)':'var(--text2)';
   const curColor=curBalance>0?'var(--green)':curBalance<0?'var(--red)':'var(--text2)';
   let html=`<div class="card-title">${t('compensation')}</div>`;
-  html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:12px;color:var(--text3);">Balance total</span><strong style="color:${balanceColor};">${bankMins>=0?'+':''}${fmtDuration(bankMins)}</strong></div>`;
-  const periodLabel=`${currentPeriod.start.slice(8)} – ${currentPeriod.end.slice(8)} ${now.toLocaleString('es',{month:'short'})}`;
+  html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:12px;color:var(--text3);">${t('lbl_total_balance')}</span><strong style="color:${balanceColor};">${bankMins>=0?'+':''}${fmtDuration(bankMins)}</strong></div>`;
+  const periodLabel=`${currentPeriod.start.slice(8)} – ${currentPeriod.end.slice(8)} ${now.toLocaleString(loc(),{month:'short'})}`;
   html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px;"><span style="font-size:12px;color:var(--text2);">${periodLabel}</span><span style="font-size:13px;font-weight:500;color:${curColor};">${curBalance>=0?'+':''}${fmtDuration(curBalance)}</span></div>`;
   html+=`<div id="period-history-${userId}" style="display:none;">`;
   periods.slice(1,7).forEach(p=>{
     const bal=periodBalance(p.start,p.end);
     if(bal===0&&allEntries.filter(e=>e.clock_in.slice(0,10)>=p.start&&e.clock_in.slice(0,10)<=p.end).length===0) return;
     const col=bal>0?'var(--green)':bal<0?'var(--red)':'var(--text3)';
-    const pLabel=`${p.start.slice(8)} – ${p.end.slice(8)} ${new Date(p.start+'T12:00:00').toLocaleString('es',{month:'short'})}`;
+    const pLabel=`${p.start.slice(8)} – ${p.end.slice(8)} ${new Date(p.start+'T12:00:00').toLocaleString(loc(),{month:'short'})}`;
     html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid var(--border);"><span style="font-size:12px;color:var(--text3);">${pLabel}</span><span style="font-size:12px;font-weight:500;color:${col};">${bal>=0?'+':''}${fmtDuration(bal)}</span></div>`;
   });
-  html+=`</div><button onclick="const el=document.getElementById('period-history-${userId}');el.style.display=el.style.display==='none'?'block':'none';this.textContent=el.style.display==='none'?'▾ Ver historial':'▴ Ocultar'" style="font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;padding:4px 0;margin-bottom:8px;">▾ Ver historial</button>`;
+  html+=`</div><button onclick="const el=document.getElementById('period-history-${userId}');el.style.display=el.style.display==='none'?'block':'none';this.textContent=el.style.display==='none'?t('btn_show_history'):t('btn_hide')" style="font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;padding:4px 0;margin-bottom:8px;">${t('btn_show_history')}</button>`;
   if(bankMins>0){
     const dopValue=Math.round((bankMins/60)*rate);
-    html+=`<div class="dop-display"><div class="dop-amount">RD$ ${dopValue.toLocaleString()}</div><div class="dop-label">${t('overtime_dop')} · ${rate} DOP/h</div></div>`;
+    html+=`<div class="dop-display"><div class="dop-amount">${t('unit_rd')} ${dopValue.toLocaleString(loc())}</div><div class="dop-label">${t('overtime_dop')} · ${rate} ${t('unit_dop_h')}</div></div>`;
     if(canRequest&&userId===currentUser?.id){ html+=`<select id="comp-type"><option value="money">${t('comp_money')}</option><option value="time_off">${t('comp_time')}</option></select><button class="btn-send" onclick="sendCompRequest(${bankMins})">${t('send_request')} →</button>`; }
     else if(!canRequest){ html+=`<div class="btn-send-locked">${t('comp_locked')}</div>`; }
   } else if(bankMins<0){
-    html+=`<div style="font-size:13px;color:var(--red);text-align:center;padding:8px 0;">⚠ ${fmtDuration(Math.abs(bankMins))} por recuperar</div>`;
+    html+=`<div style="font-size:13px;color:var(--red);text-align:center;padding:8px 0;">⚠ ${fmtDuration(Math.abs(bankMins))} ${t('lbl_to_recover')}</div>`;
   } else {
     html+=`<div class="empty">${t('no_bank')}</div>`;
   }
@@ -813,7 +1269,7 @@ async function renderVolunteerTareas() {
 
 async function renderColaborador() {
   const content=document.getElementById('main-content');
-  content.innerHTML=`<div class="tab-bar"><button class="tab active" onclick="colaboradorTab('finca')" id="tab-finca">${currentProfile.role==='coordinador'?'Oficina':'Operativo'}</button><button class="tab" onclick="colaboradorTab('terapias')" id="tab-terapias">Agenda</button><button class="tab" onclick="colaboradorTab('admin')" id="tab-admin">Admin</button></div><div class="tab-content active" id="colaborador-finca"></div><div class="tab-content" id="colaborador-terapias"></div><div class="tab-content" id="colaborador-admin"></div>`;
+  content.innerHTML=`<div class="tab-bar"><button class="tab active" onclick="colaboradorTab('finca')" id="tab-finca">${currentProfile.role==='coordinador'?t('nav_oficina'):t('nav_operativo')}</button><button class="tab" onclick="colaboradorTab('terapias')" id="tab-terapias">${t('nav_agenda')}</button><button class="tab" onclick="colaboradorTab('admin')" id="tab-admin">${t('nav_admin')}</button></div><div class="tab-content active" id="colaborador-finca"></div><div class="tab-content" id="colaborador-terapias"></div><div class="tab-content" id="colaborador-admin"></div>`;
   await loadColaboradorFinca();
 }
 
@@ -829,7 +1285,7 @@ function colaboradorTab(tab) {
 // COLABORADOR TERAPIAS — Plan de terapias
 async function loadColaboradorTerapias() {
   const el = document.getElementById('colaborador-terapias');
-  el.innerHTML = '<div class="empty">Cargando…</div>';
+  el.innerHTML = `<div class="empty">${t('loading')}</div>`;
   window._terapiasDate = window._terapiasDate || todayStr();
   await renderTerapiasDay(window._terapiasDate);
 }
@@ -877,8 +1333,6 @@ function agendaNextMonth() {
 function renderAgendaHeader() {
   const host = document.getElementById('agenda-cal');
   if (!host) return;
-  const dayNames = ['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const selected = window._terapiasDate || todayStr();
   const selDate = new Date(selected + 'T12:00:00');
   const jsDay = selDate.getDay();
@@ -888,7 +1342,7 @@ function renderAgendaHeader() {
   // Slim, tappable header
   let html = `
     <div onclick="toggleAgendaCal()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;cursor:pointer;background:var(--surface2);border-radius:12px;margin-bottom:${open?'10px':'12px'};">
-      <span style="font-size:14px;font-weight:600;">${dayNames[dow]}, ${fmtDateShort(selected)}</span>
+      <span style="font-size:14px;font-weight:600;">${dayName(dow)}, ${fmtDateShort(selected)}</span>
       <span style="font-size:12px;color:var(--text3);transition:transform .15s;${open?'transform:rotate(180deg);':''}">▾</span>
     </div>`;
 
@@ -901,11 +1355,11 @@ function renderAgendaHeader() {
       <div style="background:var(--surface2);border-radius:12px;padding:10px;margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <button onclick="agendaPrevMonth()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);">‹</button>
-          <div style="font-weight:600;font-size:14px;">${monthNames[s.m]} ${s.y}</div>
+          <div style="font-weight:600;font-size:14px;">${monthName(s.m)} ${s.y}</div>
           <button onclick="agendaNextMonth()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);">›</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
-          ${['L','M','X','J','V','S','D'].map(d=>`<div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:2px 0;">${d}</div>`).join('')}
+          ${[1,2,3,4,5,6,7].map(d=>`<div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:2px 0;">${dayInitial(d)}</div>`).join('')}
         </div>
         <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">`;
     cells.forEach(d => {
@@ -928,8 +1382,6 @@ async function renderTerapiasDay(dateStr) {
   const date = new Date(dateStr + 'T12:00:00');
   const jsDay = date.getDay(); // 0=Dom
   const dow = jsDay === 0 ? 7 : jsDay; // 1=Lun...7=Dom
-
-  const dayNames = ['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
 // Fetch profiles for prep-done-by lookup
   const {data: profilesList} = await sb.from('profiles').select('id, name');
@@ -984,15 +1436,15 @@ async function renderTerapiasDay(dateStr) {
   let html = `
     <div id="agenda-cal"></div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-      <button onclick="openExtraSessionModal()" style="background:var(--primary);color:white;border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">+ Sesión</button>
-<button onclick="openEditPlanModal()" style="background:var(--surface2);color:var(--text2);border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">✏️ Editar</button>
+      <button onclick="openExtraSessionModal()" style="background:var(--primary);color:white;border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">${t('ag_btn_add_session')}</button>
+<button onclick="openEditPlanModal()" style="background:var(--surface2);color:var(--text2);border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">${t('ag_btn_edit_plan')}</button>
     </div>
-    <div style="font-size:11px;color:var(--amber);margin-bottom:12px;">⚠ Verificar en la pizarra · ningún caballo más de 3 sesiones hoy</div>`;
+    <div style="font-size:11px;color:var(--amber);margin-bottom:12px;">${t('ag_board_warning')}</div>`;
 
   const rowHtml = (session, name, horse, timeSlot) => {
     const status = session.status;
     const statusColor = status==='confirmo'?'var(--green)':status==='cancelo'?'var(--red)':'var(--amber)';
-    const statusLabel = status==='confirmo'?'Confirmó':status==='cancelo'?'Canceló':'Pendiente';
+    const statusLabel = status==='confirmo'?t('ag_status_confirmo'):status==='cancelo'?t('ag_status_cancelo'):t('ag_status_pendiente');
     const time = fmtTimeSlot(timeSlot);
     const att = session.attendance || '';
     const attIcon = att==='asistio'?'✓':att==='ausente'?'✗':'○';
@@ -1002,11 +1454,11 @@ async function renderTerapiasDay(dateStr) {
           <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--text2);width:42px;flex-shrink:0;">${time}</div>
           <div style="flex:1;">
             <div style="font-size:14px;font-weight:500;">${name||'—'}</div>
-            <div style="font-size:11px;color:var(--text3);">${horse||'—'}${session.session_type!=='regular'?` <span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--primary-light);color:var(--primary-dark);">${session.session_type==='primera_vez'?'1ª vez':session.session_type==='reposicion'?'Repos.':'Extra'}</span>`:''}${session.prep_done_by ? ` · 🐴 ${(window.profilesMap||{})[session.prep_done_by]||'?'} · ${fmtTime(session.prep_done_at)}` : ''}</div>
+            <div style="font-size:11px;color:var(--text3);">${horse||'—'}${session.session_type!=='regular'?` <span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--primary-light);color:var(--primary-dark);">${session.session_type==='primera_vez'?t('ag_type_first'):session.session_type==='reposicion'?t('ag_type_repos'):t('ag_type_extra')}</span>`:''}${session.prep_done_by ? ` · 🐴 ${(window.profilesMap||{})[session.prep_done_by]||'?'} · ${fmtTime(session.prep_done_at)}` : ''}</div>
           </div>
           <button onclick="cycleStatus('${session.id}','${status}',this)" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1.5px solid ${statusColor};color:${statusColor};background:transparent;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;">${statusLabel}</button>
-<button onclick="cycleAttendance('${session.id}','${att}',this)" title="Asistencia" style="font-size:14px;width:30px;height:30px;line-height:1;border-radius:50%;border:1.5px solid ${attColor};color:${attColor};background:transparent;cursor:pointer;flex-shrink:0;">${attIcon}</button>
-          <button onclick="cyclePrep('${session.id}','${session.prep_done_by||''}','${session.prep_done_at||''}',this)" title="${session.prep_done_by?'Preparado — clic para desmarcar':'Marcar como preparado'}" style="font-size:16px;width:30px;height:30px;line-height:1;border-radius:50%;border:1.5px solid ${session.prep_done_by?'var(--green)':'var(--border)'};background:${session.prep_done_by?'var(--green)':'transparent'};cursor:pointer;flex-shrink:0;">🐴</button>
+<button onclick="cycleAttendance('${session.id}','${att}',this)" title="${t('ag_attendance_title')}" style="font-size:14px;width:30px;height:30px;line-height:1;border-radius:50%;border:1.5px solid ${attColor};color:${attColor};background:transparent;cursor:pointer;flex-shrink:0;">${attIcon}</button>
+          <button onclick="cyclePrep('${session.id}','${session.prep_done_by||''}','${session.prep_done_at||''}',this)" title="${session.prep_done_by?t('prep_unmark'):t('prep_mark')}" style="font-size:16px;width:30px;height:30px;line-height:1;border-radius:50%;border:1.5px solid ${session.prep_done_by?'var(--green)':'var(--border)'};background:${session.prep_done_by?'var(--green)':'transparent'};cursor:pointer;flex-shrink:0;">🐴</button>
         </div>`;
   };
 
@@ -1032,15 +1484,15 @@ async function renderTerapiasDay(dateStr) {
     });
 
   const terapiasSections = {
-    manana:   { label: 'Mañana',   range: '8:30 – 11:30 AM', items: [] },
-    mediodia: { label: 'Mediodía', range: '12:00 – 1:30 PM',  items: [] },
-    tarde:    { label: 'Tarde',    range: '2:00 – 5:30 PM',   items: [] }
+    manana:   { label: t('ag_sec_morning'),   range: '8:30 – 11:30 AM', items: [] },
+    mediodia: { label: t('ag_sec_midday'),    range: '12:00 – 1:30 PM',  items: [] },
+    tarde:    { label: t('ag_sec_afternoon'), range: '2:00 – 5:30 PM',   items: [] }
   };
   allSessionItems.forEach(s => { terapiasSections[getTerapiasSection(s.timeSlot)].items.push(s); });
 
   const hasContent = allSessionItems.length > 0;
   if(!hasContent){
-    html += '<div class="card"><div class="empty">Sin sesiones planificadas.</div></div>';
+    html += `<div class="card"><div class="empty">${t('ag_empty')}</div></div>`;
   } else {
     ['manana','mediodia','tarde'].forEach(key => {
       const sec = terapiasSections[key];
@@ -1062,7 +1514,7 @@ async function cycleStatus(sessionId, currentStatus, btn) {
   btn.disabled = true;
   const patch = next==='cancelo' ? {status: next, attendance: 'ausente'} : {status: next};
   const {error} = await sb.from('therapy_sessions').update(patch).eq('id', sessionId);
-  if(error){ btn.disabled=false; showToast('Error al actualizar'); return; }
+  if(error){ btn.disabled=false; showToast(t('err_update')); return; }
   await renderTerapiasDay(window._terapiasDate);
 }
 
@@ -1070,8 +1522,8 @@ async function cycleAttendance(sessionId, currentAtt, btn) {
   const next = currentAtt==='asistio' ? 'ausente' : currentAtt==='ausente' ? null : 'asistio';
   btn.disabled = true;
   const {data, error} = await sb.from('therapy_sessions').update({attendance: next}).eq('id', sessionId).select();
-  if(error){ btn.disabled=false; showToast('Error al actualizar'); console.error(error); return; }
-  if(!data || data.length===0){ btn.disabled=false; showToast('⚠ Sin permiso (RLS)'); return; }
+  if(error){ btn.disabled=false; showToast(t('err_update')); console.error(error); return; }
+  if(!data || data.length===0){ btn.disabled=false; showToast(t('err_rls')); return; }
   await renderTerapiasDay(window._terapiasDate);
 }
 
@@ -1082,8 +1534,8 @@ async function cyclePrep(sessionId, currentDoneBy, currentDoneAt, btn) {
     ? { prep_done_by: null, prep_done_at: null }
     : { prep_done_by: currentUser.id, prep_done_at: new Date().toISOString() };
   const {data, error} = await sb.from('therapy_sessions').update(patch).eq('id', sessionId).select();
-  if(error){ btn.disabled=false; showToast('Error al actualizar'); console.error(error); return; }
-  if(!data || data.length===0){ btn.disabled=false; showToast('⚠ Sin permiso (RLS)'); return; }
+  if(error){ btn.disabled=false; showToast(t('err_update')); console.error(error); return; }
+  if(!data || data.length===0){ btn.disabled=false; showToast(t('err_rls')); return; }
   if(window._terapiasDate) await renderTerapiasDay(window._terapiasDate);
   else await renderTerapiasHoy();
 }
@@ -1134,17 +1586,17 @@ function closeExtraSessionModal() {
 async function renderClientes() {
   const el = document.getElementById('admin-clientes');
   const {data: clients, error} = await sb.from('clients').select('*').order('name', {ascending:true});
-  if(error){ el.innerHTML='<div class="card"><div class="empty">Error al cargar.</div></div>'; console.error(error); return; }
+  if(error){ el.innerHTML=`<div class="card"><div class="empty">${t('err_load')}</div></div>`; console.error(error); return; }
   window._clientsCache = clients || [];
 
   let html = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-      <button onclick="openClientModal()" style="background:var(--primary);color:white;border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">+ Cliente</button>
+      <button onclick="openClientModal()" style="background:var(--primary);color:white;border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">${t('cli_btn_add')}</button>
     </div>
     <div class="card" style="padding:0;">`;
 
   if(!clients || clients.length===0){
-    html += '<div class="empty" style="padding:16px;">Sin clientes.</div>';
+    html += `<div class="empty" style="padding:16px;">${t('cli_empty')}</div>`;
   } else {
     clients.forEach(c => {
       const inactive = !c.is_active;
@@ -1152,12 +1604,12 @@ async function renderClientes() {
       html += `
         <div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:8px;${inactive?'opacity:0.45;':''}">
           <div style="flex:1;">
-            <div style="font-size:14px;font-weight:500;">${c.name||'—'}${inactive?' <span style="font-size:10px;color:var(--text3);">(inactivo)</span>':''}</div>
+            <div style="font-size:14px;font-weight:500;">${c.name||'—'}${inactive?` <span style="font-size:10px;color:var(--text3);">${t('lbl_inactive')}</span>`:''}</div>
             <div style="font-size:11px;color:var(--text3);">${c.horse||'—'}</div>
           </div>
-          <button onclick="openClientModal('${c.id}')" title="Editar" style="background:none;border:none;font-size:15px;cursor:pointer;">✏️</button>
-          <button onclick="toggleClientActive('${c.id}',${c.is_active})" title="${inactive?'Activar':'Desactivar'}" style="background:none;border:none;font-size:15px;cursor:pointer;">${inactive?'✅':'🚫'}</button>
-          <button onclick="deleteClientHard('${c.id}','${safeName}')" title="Eliminar" style="background:none;border:none;font-size:15px;cursor:pointer;">🗑</button>
+          <button onclick="openClientModal('${c.id}')" title="${t('btn_edit_title')}" style="background:none;border:none;font-size:15px;cursor:pointer;">✏️</button>
+          <button onclick="toggleClientActive('${c.id}',${c.is_active})" title="${inactive?t('btn_activate'):t('btn_deactivate')}" style="background:none;border:none;font-size:15px;cursor:pointer;">${inactive?'✅':'🚫'}</button>
+          <button onclick="deleteClientHard('${c.id}','${safeName}')" title="${t('btn_delete_title')}" style="background:none;border:none;font-size:15px;cursor:pointer;">🗑</button>
         </div>`;
     });
   }
@@ -1168,7 +1620,7 @@ async function renderClientes() {
 async function openClientModal(id) {
   document.getElementById('cm-id').value = id || '';
   const c = id ? (window._clientsCache||[]).find(x=>x.id===id) : null;
-  document.getElementById('cm-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+  document.getElementById('cm-title').textContent = c ? t('ttl_client_edit') : t('ttl_client_new');
   document.getElementById('cm-name').value = c ? (c.name||'') : '';
   fillHorseSelect('cm-horse', c ? (c.horse||'') : '');
   let priv = {};
@@ -1191,7 +1643,7 @@ async function saveClient() {
   const id = document.getElementById('cm-id').value;
   const name = document.getElementById('cm-name').value.trim();
   const horse = document.getElementById('cm-horse').value;
-  if(!name){ showToast('⚠ Escribe el nombre'); return; }
+  if(!name){ showToast(t('err_name')); return; }
 
   let error, data;
   if(id){
@@ -1199,8 +1651,8 @@ async function saveClient() {
   } else {
     ({data, error} = await sb.from('clients').insert({name, horse, is_active:true}).select());
   }
-  if(error){ showToast('Error al guardar'); console.error(error); return; }
-  if(!data || data.length===0){ showToast('⚠ Sin permiso (RLS)'); return; }
+  if(error){ showToast(t('err_save')); console.error(error); return; }
+  if(!data || data.length===0){ showToast(t('err_rls')); return; }
   const cid = id || data[0].id;
   const priv = { client_id: cid,
     diagnosis:  document.getElementById('cm-diagnosis').value.trim() || null,
@@ -1212,14 +1664,14 @@ async function saveClient() {
     updated_at: new Date().toISOString() };
   const {error: perr} = await sb.from('client_private').upsert(priv, {onConflict:'client_id'});
   if(perr) console.error(perr);
-  showToast('✓ Guardado');
+  showToast(t('msg_saved'));
   closeClientModal();
   await renderClientes();
 }
 
 async function toggleClientActive(id, current) {
   const {error} = await sb.from('clients').update({is_active: !current}).eq('id', id);
-  if(error){ showToast('Error'); console.error(error); return; }
+  if(error){ showToast(t('err_generic')); console.error(error); return; }
   await renderClientes();
 }
 
@@ -1228,18 +1680,18 @@ let _pendingDeleteId = null, _pendingDeleteName = null;
 let _pendingDeleteAction = null;
 
 function deleteClientHard(id, name) {
-  askDeletePin(`Eliminar "${name}"`, async () => {
+  askDeletePin(`${t('ttl_delete_named')} "${name}"`, async () => {
     const {error} = await sb.from('clients').delete().eq('id', id);
     if(error){
       console.error(error);
       if(error.code === '23503'){
-        showToast('⚠ Cliente vinculado a terapias — desactívalo en su lugar');
+        showToast(t('cli_err_linked'));
       } else {
-        showToast('Error al eliminar');
+        showToast(t('err_delete'));
       }
       return;
     }
-    showToast('✓ Eliminado');
+    showToast(t('msg_deleted'));
     await renderClientes();
   });
 }
@@ -1278,7 +1730,7 @@ async function saveExtraSession() {
   const tipo = document.querySelector('#extra-session-modal .rec-opt[data-val="reposicion"].selected, #extra-session-modal .rec-opt[data-val="primera_vez"].selected, #extra-session-modal .rec-opt[data-val="extra"].selected')?.dataset.val || 'extra';
   const isList = document.querySelector('#extra-session-modal .rec-opt[data-val="list"]')?.classList.contains('selected');
 
-  if(!date || !time){ showToast('⚠ Completa fecha y hora'); return; }
+  if(!date || !time){ showToast(t('err_date_time')); return; }
 
   let insert = {
     date,
@@ -1295,14 +1747,14 @@ async function saveExtraSession() {
     insert.horse = opt?.dataset.horse || '—';
   } else {
     const name = document.getElementById('es-client-name').value.trim();
-    if(!name){ showToast('⚠ Escribe el nombre'); return; }
+    if(!name){ showToast(t('err_name')); return; }
     insert.client_name = name;
     insert.horse = document.getElementById('es-horse-free').value;
   }
 
   const {error} = await sb.from('therapy_sessions').insert(insert);
-  if(error){ showToast('Error al guardar'); console.error(error); return; }
-  showToast('✓ Sesión guardada');
+  if(error){ showToast(t('err_save')); console.error(error); return; }
+  showToast(t('msg_session_saved'));
   closeExtraSessionModal();
   await renderTerapiasDay(window._terapiasDate || todayStr());
 }
@@ -1318,7 +1770,7 @@ function closeEditPlanModal() {
 
 async function loadEditPlanContent() {
   const el = document.getElementById('edit-plan-content');
-  el.innerHTML = '<div class="empty">Cargando…</div>';
+  el.innerHTML = `<div class="empty">${t('loading')}</div>`;
 
   const {data: slots} = await sb
     .from('therapy_schedule')
@@ -1333,8 +1785,6 @@ async function loadEditPlanContent() {
     .eq('is_active', true)
     .order('name', {ascending: true});
 
-  const dayNames = ['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-
   // Group slots by day
   const byDay = {};
   (slots||[]).forEach(s => {
@@ -1348,7 +1798,7 @@ async function loadEditPlanContent() {
   [1,2,3,4,5,6,7].forEach(dow => {
     const daySlots = byDay[dow] || [];
     if(daySlots.length === 0) return;
-    html += `<div style="margin-bottom:12px;"><div class="card-title">${dayNames[dow]}</div>`;
+    html += `<div style="margin-bottom:12px;"><div class="card-title">${dayName(dow)}</div>`;
     daySlots.forEach(slot => {
       const time = fmtTimeSlot(slot.time_slot);
       html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
@@ -1368,22 +1818,22 @@ async function loadEditPlanContent() {
   ).join('');
 
   html += `<div style="border-top:2px solid var(--border);padding-top:12px;margin-top:4px;">
-    <div class="card-title">Agregar slot</div>
+    <div class="card-title">${t('ttl_add_slot')}</div>
     <div class="form-row" style="margin-bottom:8px;">
-      <div class="field-label">Día</div>
+      <div class="field-label">${t('lbl_day')}</div>
       <select class="form-input" id="ep-day">
-        ${[1,2,3,4,5,6,7].map(d=>`<option value="${d}">${dayNames[d]}</option>`).join('')}
+        ${[1,2,3,4,5,6,7].map(d=>`<option value="${d}">${dayName(d)}</option>`).join('')}
       </select>
     </div>
     <div class="form-row" style="margin-bottom:8px;">
-      <div class="field-label">Hora</div>
+      <div class="field-label">${t('lbl_time')}</div>
       <span id="ep-time-wrap"></span>
     </div>
     <div class="form-row" style="margin-bottom:12px;">
-      <div class="field-label">Cliente</div>
+      <div class="field-label">${t('lbl_client')}</div>
       <select class="form-input" id="ep-client">${clientOptions}</select>
     </div>
-    <button class="btn-primary" onclick="saveNewSlot()">Agregar →</button>
+    <button class="btn-primary" onclick="saveNewSlot()">${t('btn_add')}</button>
   </div>`;
 
   el.innerHTML = html;
@@ -1391,10 +1841,10 @@ async function loadEditPlanContent() {
 }
 
 async function deactivateSlot(slotId, label) {
-  askDeletePin(label ? `Eliminar slot · ${label}` : 'Eliminar slot', async () => {
+  askDeletePin(label ? `${t('ttl_delete_slot')} · ${label}` : t('ttl_delete_slot'), async () => {
     const {error} = await sb.from('therapy_schedule').update({is_active: false}).eq('id', slotId);
-    if(error){ showToast('Error al eliminar'); return; }
-    showToast('✓ Slot eliminado');
+    if(error){ showToast(t('err_delete')); return; }
+    showToast(t('msg_slot_deleted'));
     await loadEditPlanContent();
   });
 }
@@ -1406,7 +1856,7 @@ async function saveNewSlot() {
   const clientId = clientSel.value;
   const horse = clientSel.options[clientSel.selectedIndex]?.dataset.horse || '—';
 
-  if(!time || !clientId){ showToast('⚠ Completa todos los campos'); return; }
+  if(!time || !clientId){ showToast(t('err_all_fields')); return; }
 
   const {error} = await sb.from('therapy_schedule').insert({
     client_id: clientId,
@@ -1415,8 +1865,8 @@ async function saveNewSlot() {
     is_active: true
   });
 
-  if(error){ showToast('Error al guardar'); console.error(error); return; }
-  showToast('✓ Slot agregado');
+  if(error){ showToast(t('err_save')); console.error(error); return; }
+  showToast(t('msg_slot_added'));
   await loadEditPlanContent();
 }
 
@@ -1425,30 +1875,30 @@ async function loadColaboradorFinca() {
   if(currentProfile.role==='coordinador'){ await loadCoordinadoraOficina(); return; }
   document.getElementById('colaborador-finca').innerHTML=`
     <div class="tab-bar" style="margin:0 0 8px 0;">
-      <button class="tab active" onclick="operativoTab('voluntarios')" id="otab-voluntarios">Voluntarios</button>
-      <button class="tab" onclick="operativoTab('finca')" id="otab-finca">Finca</button>
-      <button class="tab" onclick="operativoTab('oficina')" id="otab-oficina">Oficina</button>
-      <button class="tab" onclick="operativoTab('ejecutivo')" id="otab-ejecutivo">Ejecutivo</button>
+      <button class="tab active" onclick="operativoTab('voluntarios')" id="otab-voluntarios">${t('nav_voluntarios')}</button>
+      <button class="tab" onclick="operativoTab('finca')" id="otab-finca">${t('nav_finca')}</button>
+      <button class="tab" onclick="operativoTab('oficina')" id="otab-oficina">${t('nav_oficina')}</button>
+      <button class="tab" onclick="operativoTab('ejecutivo')" id="otab-ejecutivo">${t('nav_ejecutivo')}</button>
     </div>
     <div class="tab-content active" id="operativo-voluntarios"></div>
     <div class="tab-content" id="operativo-finca">
       <div class="tab-bar" style="margin:0 0 8px 0;">
-        <button class="tab active" onclick="fincaTab('diario')" id="ftab-diario">Diario</button>
-        <button class="tab" onclick="fincaTab('semanal')" id="ftab-semanal">Semanal</button>
+        <button class="tab active" onclick="fincaTab('diario')" id="ftab-diario">${t('nav_diario')}</button>
+        <button class="tab" onclick="fincaTab('semanal')" id="ftab-semanal">${t('nav_semanal')}</button>
       </div>
       <div class="tab-content active" id="finca-diario"></div>
       <div class="tab-content" id="finca-semanal"></div>
     </div>
     <div class="tab-content" id="operativo-oficina">
       <div class="tab-bar" style="margin:0 0 8px 0;">
-        <button class="tab active" onclick="oficinaColTab('diario')" id="octab-diario">Diario</button>
-        <button class="tab" onclick="oficinaColTab('semanal')" id="octab-semanal">Semanal</button>
+        <button class="tab active" onclick="oficinaColTab('diario')" id="octab-diario">${t('nav_diario')}</button>
+        <button class="tab" onclick="oficinaColTab('semanal')" id="octab-semanal">${t('nav_semanal')}</button>
       </div>
       <div class="tab-content active" id="oficina-col-diario"></div>
       <div class="tab-content" id="oficina-col-semanal"></div>
     </div>
     <div class="tab-content" id="operativo-ejecutivo">
-      <div class="card"><div class="empty">Ejecutivo · próximamente</div></div>
+      <div class="card"><div class="empty">${t('msg_coming_soon')}</div></div>
     </div>`;
   await loadColaboradorDiario();
   await loadColaboradorVoluntarios();
@@ -1466,9 +1916,9 @@ async function loadColaboradorVoluntarios() {
     const d=lastDoneMap[task.id];
     return {task, last:d, sortKey:d?new Date(d.ts).getTime():-1};
   }).sort((a,b)=>a.sortKey-b.sortKey);
-  let html='<div class="card" style="padding:0;"><div style="padding:10px 16px 6px;border-bottom:1px solid var(--border);"><div class="card-title" style="margin-bottom:0;">Tareas de voluntarios</div></div>';
+  let html=`<div class="card" style="padding:0;"><div style="padding:10px 16px 6px;border-bottom:1px solid var(--border);"><div class="card-title" style="margin-bottom:0;">${t('ttl_volunteer_tasks')}</div></div>`;
   rows.forEach(r=>{
-    const info=r.last?`Última vez: ${fmtDateShort(r.last.date)} · ${r.last.name||'?'}`:'Nunca';
+    const info=r.last?`${t('lbl_last_time_full')} ${fmtDateShort(r.last.date)} · ${r.last.name||'?'}`:t('never');
     html+=`<div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:12px;"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${taskDisplayName(r.task)}</div><div style="font-size:11px;color:var(--text3);">${info}</div></div></div>`;
   });
   html+='</div>';
@@ -1504,9 +1954,9 @@ function fincaTab(tab) {
 async function loadCoordinadoraOficina() {
   document.getElementById('colaborador-finca').innerHTML=`
     <div class="tab-bar" style="margin:0 0 8px 0;">
-      <button class="tab active" onclick="oficinaTab('diario')" id="otab-diario">Diario</button>
-      <button class="tab" onclick="oficinaTab('semanal')" id="otab-semanal">Semanal</button>
-      <button class="tab" onclick="oficinaTab('balance')" id="otab-balance">Balance</button>
+      <button class="tab active" onclick="oficinaTab('diario')" id="otab-diario">${t('nav_diario')}</button>
+      <button class="tab" onclick="oficinaTab('semanal')" id="otab-semanal">${t('nav_semanal')}</button>
+      <button class="tab" onclick="oficinaTab('balance')" id="otab-balance">${t('nav_balance')}</button>
     </div>
     <div class="tab-content active" id="oficina-diario">
       <div class="card">
@@ -1538,7 +1988,7 @@ function oficinaTab(tab) {
 async function renderCoordinadoraBalance() {
   const el=document.getElementById('oficina-balance');
   if(!el) return;
-  el.innerHTML='<div class="empty">Cargando…</div>';
+  el.innerHTML=`<div class="empty">${t('loading')}</div>`;
   const {data:allEntries}=await sb.from('time_entries').select('*').eq('user_id',currentUser.id);
   const {data:approved}=await sb.from('compensation_requests').select('*').eq('user_id',currentUser.id).eq('status','approved');
   const compEl=document.createElement('div');
@@ -1559,7 +2009,7 @@ async function refreshCoordinadoraState() {
   const btns=document.getElementById('punch-buttons');
   if(btns){ btns.innerHTML=activeEntry?`<button class="punch-btn out" onclick="punchOut()">${t('clock_out')}</button>`:`<button class="punch-btn in" onclick="punchInGps('work')">${t('clock_in')}</button>`; }
   const mEl=document.getElementById('coord-metrics');
-  if(mEl){ mEl.innerHTML=`<div class="metric"><div class="metric-label">${t('today')}</div><div class="metric-val neutral">${fmtDuration(workedMins)}</div></div><div class="metric"><div class="metric-label">Saldo</div><div class="metric-val ${balanceMins>0?'positive':balanceMins<0?'negative':'neutral'}">${balanceMins>=0?'+':'−'}${fmtDuration(Math.abs(balanceMins))}</div></div>`; }
+  if(mEl){ mEl.innerHTML=`<div class="metric"><div class="metric-label">${t('today')}</div><div class="metric-val neutral">${fmtDuration(workedMins)}</div></div><div class="metric"><div class="metric-label">${t('lbl_saldo')}</div><div class="metric-val ${balanceMins>0?'positive':balanceMins<0?'negative':'neutral'}">${balanceMins>=0?'+':'−'}${fmtDuration(Math.abs(balanceMins))}</div></div>`; }
   const histEl=document.getElementById('history-card');
   if(histEl){
     let histHTML=`<div class="card-title">${t('history')}</div>`;
@@ -1580,9 +2030,9 @@ async function loadColaboradorTeam() {
   const entriesByUser={};
   (allEntries||[]).forEach(e=>{ (entriesByUser[e.user_id]=entriesByUser[e.user_id]||[]).push(e); });
   const groups=[
-    {role:'pesticero',   label:'Pesticeros',   av:'av-brown'},
-    {role:'coordinador', label:'Coordinador', av:'av-primary'},
-    {role:'volunteer',   label:'Voluntarios',  av:'av-primary'},
+    {role:'pesticero',   label:t('group_pesticeros'),   av:'av-brown'},
+    {role:'coordinador', label:t('group_coordinador'), av:'av-primary'},
+    {role:'volunteer',   label:t('group_voluntarios'),  av:'av-primary'},
   ];
   let html='';
   groups.forEach(g=>{
@@ -1604,7 +2054,7 @@ async function loadColaboradorTeam() {
       rows+='<div class="team-row" onclick="openHistoryModal(\''+p.id+'\',\''+safeName+'\')">'
         +'<div class="status-dot '+(active?'dot-green':'dot-gray')+'"></div>'
         +'<div class="avatar '+g.av+'">'+initials+'</div>'
-        +'<div class="team-info"><div class="team-name">'+p.name.split(' ').slice(0,2).join(' ')+'</div><div class="team-sub">'+(active?(active.entry_type==='merienda'?'🍽 Merienda':fmtTime(active.clock_in)+' →'):'— · Ver historial →')+'</div></div>'
+        +'<div class="team-info"><div class="team-name">'+p.name.split(' ').slice(0,2).join(' ')+'</div><div class="team-sub">'+(active?(active.entry_type==='merienda'?t('lbl_on_merienda'):fmtTime(active.clock_in)+' →'):t('lbl_see_history_arrow'))+'</div></div>'
         +'<div class="team-right"><div class="team-hours">'+fmtDuration(workedMins)+'</div>'+right+'</div></div>';
     });
     html+=`<div class="card"><div class="card-title">${g.label}</div>${rows}</div>`;
@@ -1619,8 +2069,8 @@ async function openHistoryModal(userId, name) {
   document.getElementById('history-modal-content').innerHTML='<div class="empty">'+t('loading')+'</div>';
   document.getElementById('history-modal').style.display='flex';
   let html=`<div style="display:flex;gap:6px;margin-bottom:12px;">
-    <button id="htab-time" onclick="showHistoryTab('time','${userId}')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:none;background:var(--primary);color:white;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;">⏱ Tiempo</button>
-    <button id="htab-comp" onclick="showHistoryTab('comp','${userId}')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:none;background:var(--surface2);color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">💰 Balance</button>
+    <button id="htab-time" onclick="showHistoryTab('time','${userId}')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:none;background:var(--primary);color:white;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;">${t('nav_time')}</button>
+    <button id="htab-comp" onclick="showHistoryTab('comp','${userId}')" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:none;background:var(--surface2);color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">${t('nav_balance_money')}</button>
   </div>
   <div id="htab-time-content"></div>
   <div id="htab-comp-content" style="display:none;"></div>`;
@@ -1648,8 +2098,8 @@ async function showHistoryTab(tab, userId) {
       dayWorked+=meriendaCreditMins(dayEntries);
       html+=`<div class="history-day"><div class="history-day-label">${fmtDateShort(day)}</div>`;
       dayEntries.forEach(e=>{
-        const typeIn=e.entry_type==='merienda'?'☕ Merienda inicio':'▶ Entrada';
-        const typeOut=e.entry_type==='merienda'?'☕ Merienda fin':'⏹ Salida';
+        const typeIn=e.entry_type==='merienda'?'☕ '+t('entry_merienda_in'):'▶ '+t('entry_work_in');
+        const typeOut=e.entry_type==='merienda'?'☕ '+t('entry_merienda_out'):'⏹ '+t('entry_work_out');
         html+=`<div class="history-entry"><span class="history-type">${typeIn}</span><span class="history-time">${fmtTime(e.clock_in)}</span></div>`;
         if(e.clock_out) html+=`<div class="history-entry"><span class="history-type">${typeOut}</span><span class="history-time">${fmtTime(e.clock_out)}</span></div>`;
       });
@@ -1673,7 +2123,7 @@ async function loadColaboradorDiario() {
   const today=todayStr();
   const {data:pesticeros}=await sb.from('profiles').select('*').eq('active',true).eq('role','pesticero');
   const fincaCanEdit = currentProfile.role!=='coordinador';
-  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span class="card-title" style="margin-bottom:0;">${t('daily_plan')}</span>${fincaCanEdit?`<button onclick="openExtraModal()" style="background:var(--primary);color:white;border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">+ Tarea extra</button>`:''}</div>`;
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span class="card-title" style="margin-bottom:0;">${t('daily_plan')}</span>${fincaCanEdit?`<button onclick="openExtraModal()" style="background:var(--primary);color:white;border:none;border-radius:20px;padding:5px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">${t('btn_add_extra_task')}</button>`:''}</div>`;
   for(const p of (pesticeros||[])){
     const tasks=DAILY_BY_USER[p.id]||[];
     const {data:completions}=await sb.from('task_completions').select('*').eq('user_id',p.id).eq('date',today).eq('task_type','daily');
@@ -1686,8 +2136,8 @@ async function loadColaboradorDiario() {
     const doneCount=Object.values(doneMap).filter(v=>v).length+Object.values(extraDoneMap).filter(v=>v).length;
     const totalCount=tasks.length+extras.length;
     html+=`<div class="card"><div class="card-title">${firstName} · ${doneCount}/${totalCount} ${t('completed_at')}</div>`;
-    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}m</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${task.name}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}min</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
-    extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const recLabel=task.recurrence==='once'?t('rec_once'):task.recurrence==='daily'?t('rec_daily'):task.recurrence==='weekly'?t('rec_weekly'):t('rec_monfri'); const istHtml=isDone?`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(extraDoneMap[task.id])} ✓</div>`:`<span style="font-size:11px;color:var(--text3);">—</span>`; html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':''}">${task.name} <span class="extra-badge">${recLabel}</span></div><div class="colaborador-task-target">${task.duration_mins?task.duration_mins+'min':'—'}${task.note?' · '+task.note:''}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
+    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}${t('unit_m')}</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${task.name}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}${t('unit_min')}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
+    extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const recLabel=task.recurrence==='once'?t('rec_once'):task.recurrence==='daily'?t('rec_daily'):task.recurrence==='weekly'?t('rec_weekly'):t('rec_monfri'); const istHtml=isDone?`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(extraDoneMap[task.id])} ✓</div>`:`<span style="font-size:11px;color:var(--text3);">—</span>`; html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':''}">${task.name} <span class="extra-badge">${recLabel}</span></div><div class="colaborador-task-target">${task.duration_mins?task.duration_mins+t('unit_min'):'—'}${task.note?' · '+task.note:''}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
     html+='</div>';
   }
   document.getElementById('finca-diario').innerHTML=html||'<div class="card"><div class="empty">—</div></div>';
@@ -1711,7 +2161,7 @@ async function loadColaboradorDiarioOficina() {
     const totalCount=tasks.length;
     html+=`<div class="card"><div class="card-title">${firstName} · ${doneCount}/${totalCount} ${t('completed_at')}</div>`;
     if(tasks.length===0){ html+=`<div class="empty" style="padding:1rem 0;">—</div>`; }
-    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}m</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${task.name}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}min</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
+    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}${t('unit_m')}</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${task.name}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}${t('unit_min')}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
     html+='</div>';
   }
   el.innerHTML=html||'<div class="card"><div class="empty">—</div></div>';
@@ -1749,19 +2199,19 @@ async function renderColaboradorSemanal() {
     const count=weeklyCountMap[task.id]||0; const done=count>=task.freq;
     const doneBy=weeklyDoneByMap[task.id]||[];
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+'h'+(task.dur%60?pad(task.dur%60)+'m':''):task.dur+'min'}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('biweekly_tasks')}</div>`;
   RECURRING.biweekly.forEach(task=>{
     const doneBy=biweeklyDoneByMap2[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}min${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('monthly_tasks')}</div>`;
   RECURRING.monthly.forEach(task=>{
     const doneBy=monthlyDoneByMap[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}min${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div>`;
 
@@ -1780,7 +2230,7 @@ async function switchWplanPerson(uid) {
 async function renderColaboradorSemanaForPerson(uid) {
   const user=(window._wplanColaboradorUsers||[]).find(u=>u.id===uid);
   if(!user){ document.getElementById('wplan-colaborador-content').innerHTML='<div class="empty">—</div>'; return; }
-  document.getElementById('wplan-colaborador-content').innerHTML='<div class="empty">Cargando…</div>';
+  document.getElementById('wplan-colaborador-content').innerHTML=`<div class="empty">${t('loading')}</div>`;
   await renderWeekPlanView('wplan-colaborador-content', user.id, currentProfile.role!=='coordinador');
 }
 
@@ -1812,19 +2262,19 @@ async function renderColaboradorSemanalOficina() {
     const count=weeklyCountMap[task.id]||0; const done=count>=task.freq;
     const doneBy=weeklyDoneByMap[task.id]||[];
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+'h'+(task.dur%60?pad(task.dur%60)+'m':''):task.dur+'min'}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('biweekly_tasks')}</div>`;
   RECURRING_OFICINA.biweekly.forEach(task=>{
     const doneBy=biweeklyDoneByMap2[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}min${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('monthly_tasks')}</div>`;
   RECURRING_OFICINA.monthly.forEach(task=>{
     const doneBy=monthlyDoneByMap[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}min${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div>`;
   const toggleHtml=coordList.map((p,i)=>`<button class="wplan-person-btn-of${i===0?' active':''}" data-uid="${p.id}" onclick="switchWplanPersonOficina('${p.id}')">${p.name.split(' ')[0]}</button>`).join('');
@@ -1842,7 +2292,7 @@ async function renderColaboradorSemanaForPersonOficina(uid) {
   const user=(window._wplanColaboradorUsersOficina||[]).find(u=>u.id===uid);
   const cont=document.getElementById('wplan-colaborador-content-of');
   if(!user){ if(cont) cont.innerHTML='<div class="empty">—</div>'; return; }
-  if(cont) cont.innerHTML='<div class="empty">Cargando…</div>';
+  if(cont) cont.innerHTML=`<div class="empty">${t('loading')}</div>`;
   // isColaborador=true -> editable (+ Agregar); scope 'oficina' -> dropdown shows oficina tasks
   await renderWeekPlanView('wplan-colaborador-content-of', user.id, true, 'oficina');
 }
@@ -1851,11 +2301,11 @@ async function renderColaboradorSemanaForPersonOficina(uid) {
 async function loadColaboradorAdmin() {
   document.getElementById('colaborador-admin').innerHTML=`
     <div class="tab-bar" style="margin:0 0 8px 0;">
-      <button class="tab active" onclick="adminTab('equipo')" id="atab-equipo">Equipo</button>
-      <button class="tab" onclick="adminTab('clientes')" id="atab-clientes">Clientes</button>
-      <button class="tab" onclick="adminTab('finanzas')" id="atab-finanzas">Finanzas</button>
-      <button class="tab" onclick="adminTab('inventario')" id="atab-inventario">Inventario</button>
-      <button class="tab" onclick="adminTab('exportar')" id="atab-exportar">Exportar</button>
+      <button class="tab active" onclick="adminTab('equipo')" id="atab-equipo">${t('nav_equipo')}</button>
+      <button class="tab" onclick="adminTab('clientes')" id="atab-clientes">${t('nav_clientes')}</button>
+      <button class="tab" onclick="adminTab('finanzas')" id="atab-finanzas">${t('nav_finanzas')}</button>
+      <button class="tab" onclick="adminTab('inventario')" id="atab-inventario">${t('nav_inventario')}</button>
+      <button class="tab" onclick="adminTab('exportar')" id="atab-exportar">${t('nav_exportar')}</button>
     </div>
     <div class="tab-content active" id="admin-equipo">
       <div id="admin-equipo-team"></div>
@@ -1918,27 +2368,26 @@ async function renderExportar() {
   const weekStart = getWeekStart().slice(0, 10);
   el.innerHTML = `
     <div class="card">
-      <div class="card-title">Exportar datos (CSV)</div>
+      <div class="card-title">${t('exp_title')}</div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.5;">
-        Elige un rango de fechas, descarga el archivo y súbelo a Google Drive.
-        Se abre directamente en Google Sheets.
+        ${t('exp_intro')}
       </div>
       <div style="display:flex;gap:8px;margin-bottom:14px;">
         <div style="flex:1;">
-          <div class="field-label">Desde</div>
+          <div class="field-label">${t('lbl_from')}</div>
           <input class="form-input" type="date" id="exp-from" value="${weekStart}" style="margin-bottom:0;">
         </div>
         <div style="flex:1;">
-          <div class="field-label">Hasta</div>
+          <div class="field-label">${t('lbl_to')}</div>
           <input class="form-input" type="date" id="exp-to" value="${today}" style="margin-bottom:0;">
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;">
-        <button class="btn-primary" onclick="exportTareas()">⬇ Tareas completadas</button>
-        <button class="btn-primary" onclick="exportTiempo()">⬇ Registro de tiempo</button>
-        <button class="btn-primary" onclick="exportAgenda()">⬇ Agenda (terapias)</button>
-        <button class="btn-primary" onclick="exportInventario()">⬇ Inventario (actual)</button>
-        <button class="btn-primary" onclick="exportInventarioHistorial()">⬇ Inventario (historial de revisiones)</button>
+        <button class="btn-primary" onclick="exportTareas()">${t('exp_btn_tasks')}</button>
+        <button class="btn-primary" onclick="exportTiempo()">${t('exp_btn_time')}</button>
+        <button class="btn-primary" onclick="exportAgenda()">${t('exp_btn_agenda')}</button>
+        <button class="btn-primary" onclick="exportInventario()">${t('exp_btn_inv')}</button>
+        <button class="btn-primary" onclick="exportInventarioHistorial()">${t('exp_btn_inv_hist')}</button>
       </div>
     </div>`;
 }
@@ -1946,7 +2395,7 @@ async function renderExportar() {
 // Placeholders — filled in the next steps:
 async function exportTareas() {
   const { from, to } = exportRange();
-  if (!from || !to) { showToast('⚠ Elige un rango de fechas'); return; }
+  if (!from || !to) { showToast(t('exp_err_no_range')); return; }
 
   // Build task_id -> name lookup from the unified `tasks` table (+ volunteer_pool + extra_tasks).
   // daily/weekly/biweekly/monthly completions all carry a tasks.id in task_id, so a single
@@ -1971,29 +2420,29 @@ async function exportTareas() {
     .not('completed_at', 'is', null)
     .order('date', { ascending: true });
 
-  if (error) { showToast('Error al exportar'); console.error(error); return; }
-  if (!data || data.length === 0) { showToast('Sin datos en ese rango'); return; }
+  if (error) { showToast(t('exp_err')); console.error(error); return; }
+  if (!data || data.length === 0) { showToast(t('exp_err_no_data_range')); return; }
 
   const typeLabel = {
-    daily: 'Diaria', weekly: 'Semanal', biweekly: 'Quincenal',
-    monthly: 'Mensual', extra: 'Extra', vol_pool: 'Voluntario'
+    daily: t('exp_v_daily'), weekly: t('exp_v_weekly'), biweekly: t('exp_v_biweekly'),
+    monthly: t('exp_v_monthly'), extra: t('exp_v_extra'), vol_pool: t('exp_v_volunteer')
   };
 
-  const headers = ['Fecha', 'Persona', 'Tarea', 'Tipo', 'Completado'];
+  const headers = [t('exp_h_date'), t('exp_h_person'), t('exp_h_task'), t('exp_h_type'), t('exp_h_completed')];
   const rows = data.map(c => [
     c.date,
     c.profiles?.name || '',
     nameById[c.task_id] || c.task_id,
     typeLabel[c.task_type] || c.task_type,
-    c.completed_at ? new Date(c.completed_at).toLocaleString('es-DO') : ''
+    c.completed_at ? new Date(c.completed_at).toLocaleString(loc()) : ''
   ]);
 
-  downloadCSV(`tareas-${from}_a_${to}.csv`, headers, rows);
-  showToast(`✓ ${rows.length} tareas exportadas`);
+  downloadCSV(`${t('exp_file_tasks')}-${from}_${t('exp_file_range')}_${to}.csv`, headers, rows);
+  showToast(t('exp_msg_tasks',{n:rows.length}));
 }
 async function exportTiempo() {
   const { from, to } = exportRange();
-  if (!from || !to) { showToast('⚠ Elige un rango de fechas'); return; }
+  if (!from || !to) { showToast(t('exp_err_no_range')); return; }
 
   // clock_in is a timestamp, so range = [from 00:00, to 23:59:59]
   const fromTs = new Date(from + 'T00:00:00').toISOString();
@@ -2006,12 +2455,12 @@ async function exportTiempo() {
     .lte('clock_in', toTs)
     .order('clock_in', { ascending: true });
 
-  if (error) { showToast('Error al exportar'); console.error(error); return; }
-  if (!data || data.length === 0) { showToast('Sin datos en ese rango'); return; }
+  if (error) { showToast(t('exp_err')); console.error(error); return; }
+  if (!data || data.length === 0) { showToast(t('exp_err_no_data_range')); return; }
 
-  const typeLabel = { work: 'Trabajo', merienda: 'Merienda' };
+  const typeLabel = { work: t('exp_v_work'), merienda: t('exp_v_merienda') };
 
-  const headers = ['Fecha', 'Persona', 'Tipo', 'Entrada', 'Salida', 'Duración (min)'];
+  const headers = [t('exp_h_date'), t('exp_h_person'), t('exp_h_type'), t('exp_h_in'), t('exp_h_out'), t('exp_h_dur_min')];
   const rows = data.map(e => {
     const inDate = new Date(e.clock_in);
     const out = e.clock_out ? new Date(e.clock_out) : null;
@@ -2020,18 +2469,18 @@ async function exportTiempo() {
       e.clock_in.slice(0, 10),
       e.profiles?.name || '',
       typeLabel[e.entry_type] || e.entry_type,
-      inDate.toLocaleTimeString('es-DO'),
-      out ? out.toLocaleTimeString('es-DO') : '(abierto)',
+      inDate.toLocaleTimeString(loc()),
+      out ? out.toLocaleTimeString(loc()) : t('exp_v_open'),
       mins
     ];
   });
 
-  downloadCSV(`tiempo-${from}_a_${to}.csv`, headers, rows);
-  showToast(`✓ ${rows.length} registros exportados`);
+  downloadCSV(`${t('exp_file_time')}-${from}_${t('exp_file_range')}_${to}.csv`, headers, rows);
+  showToast(t('exp_msg_time',{n:rows.length}));
 }
 async function exportAgenda() {
   const { from, to } = exportRange();
-  if (!from || !to) { showToast('⚠ Elige un rango de fechas'); return; }
+  if (!from || !to) { showToast(t('exp_err_no_range')); return; }
 
   const { data, error } = await sb
     .from('therapy_sessions')
@@ -2041,21 +2490,21 @@ async function exportAgenda() {
     .order('date', { ascending: true })
     .order('time_slot', { ascending: true });
 
-  if (error) { showToast('Error al exportar'); console.error(error); return; }
-  if (!data || data.length === 0) { showToast('Sin datos en ese rango'); return; }
+  if (error) { showToast(t('exp_err')); console.error(error); return; }
+  if (!data || data.length === 0) { showToast(t('exp_err_no_data_range')); return; }
 
   const statusLabel = {
-    pendiente: 'Pendiente', confirmo: 'Confirmó', cancelo: 'Canceló'
+    pendiente: t('ag_status_pendiente'), confirmo: t('ag_status_confirmo'), cancelo: t('ag_status_cancelo')
   };
   const attLabel = {
-    asistio: 'Asistió', ausente: 'Ausente'
+    asistio: t('exp_v_present'), ausente: t('exp_v_absent')
   };
   const typeLabel = {
-    regular: 'Regular', reposicion: 'Reposición',
-    primera_vez: 'Primera vez', extra: 'Extra'
+    regular: t('exp_v_regular'), reposicion: t('exp_v_reposicion'),
+    primera_vez: t('exp_v_first'), extra: t('exp_v_extra')
   };
 
-  const headers = ['Fecha', 'Hora', 'Cliente', 'Caballo', 'Tipo', 'Estado', 'Asistencia'];
+  const headers = [t('exp_h_date'), t('exp_h_time'), t('exp_h_client'), t('exp_h_horse'), t('exp_h_type'), t('exp_h_status'), t('exp_h_attendance')];
   const rows = data.map(s => [
     s.date,
     s.time_slot || '',
@@ -2066,19 +2515,19 @@ async function exportAgenda() {
     s.attendance ? (attLabel[s.attendance] || s.attendance) : '—'
   ]);
 
-  downloadCSV(`agenda-${from}_a_${to}.csv`, headers, rows);
-  showToast(`✓ ${rows.length} sesiones exportadas`);
+  downloadCSV(`${t('exp_file_agenda')}-${from}_${t('exp_file_range')}_${to}.csv`, headers, rows);
+  showToast(t('exp_msg_agenda',{n:rows.length}));
 }
 // Inventario — current live stock, all fields + computed alert
 async function exportInventario() {
   const { data: items } = await sb.from('inventory_items')
     .select('*').order('sort_order').order('name');
-  if (!items || items.length === 0) { showToast('⚠ Sin artículos'); return; }
+  if (!items || items.length === 0) { showToast(t('inv_err_no_items')); return; }
   const alertLabel = it => {
     const a = inventoryAlert(it);
-    return a === 'urgent' ? 'Comprar urgente' : a === 'week' ? 'Comprar esta semana' : 'OK';
+    return a === 'urgent' ? t('exp_v_buy_urgent') : a === 'week' ? t('exp_v_buy_week') : t('exp_v_ok');
   };
-  const headers = ['Emoji','Artículo','Categoría','Cantidad','Unidad','Tipo','Alerta urgente <','Alerta semana <','Estado','Última actualización'];
+  const headers = [t('exp_h_emoji'),t('exp_h_item'),t('exp_h_category'),t('exp_h_qty'),t('exp_h_unit'),t('exp_h_type'),t('exp_h_alert_urgent'),t('exp_h_alert_week'),t('exp_h_status'),t('exp_h_updated')];
   const rows = items.map(it => [
     it.emoji || '', it.name, it.category || '', it.quantity,
     it.unit || '', it.unit_type || '',
@@ -2086,15 +2535,15 @@ async function exportInventario() {
     alertLabel(it),
     it.updated_at ? it.updated_at.slice(0, 10) : ''
   ]);
-  downloadCSV(`inventario-actual-${exportStamp()}.csv`, headers, rows);
-  showToast('✓ Descargado');
+  downloadCSV(`${t('exp_file_inv')}-${exportStamp()}.csv`, headers, rows);
+  showToast(t('exp_msg_downloaded'));
 }
 
 // Inventario — snapshot history within the selected date range
 // One row per item per revisión (long format, ideal for Sheets time-series)
 async function exportInventarioHistorial() {
   const { from, to } = exportRange();
-  if (!from || !to) { showToast('⚠ Elige un rango de fechas'); return; }
+  if (!from || !to) { showToast(t('exp_err_no_range')); return; }
   // Snapshots in range (inclusive; +1 day on 'to' to cover the whole day)
   const toEnd = to + 'T23:59:59';
   const { data: snaps } = await sb.from('inventory_snapshots')
@@ -2102,19 +2551,19 @@ async function exportInventarioHistorial() {
     .gte('taken_at', from + 'T00:00:00')
     .lte('taken_at', toEnd)
     .order('taken_at', { ascending: true });
-  if (!snaps || snaps.length === 0) { showToast('⚠ Sin revisiones en el rango'); return; }
+  if (!snaps || snaps.length === 0) { showToast(t('exp_err_no_checks')); return; }
   const ids = snaps.map(s => s.id);
   const { data: lines } = await sb.from('inventory_snapshot_lines')
     .select('*').in('snapshot_id', ids);
-  if (!lines || lines.length === 0) { showToast('⚠ Sin datos'); return; }
+  if (!lines || lines.length === 0) { showToast(t('exp_err_no_data')); return; }
   // Map snapshot_id -> {date, by, note} for joining
   const meta = {};
   snaps.forEach(s => { meta[s.id] = {
     date: s.taken_at.slice(0, 10),
-    time: new Date(s.taken_at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }),
+    time: new Date(s.taken_at).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' }),
     by: s.taken_by || '', note: s.note || ''
   }; });
-  const headers = ['Fecha','Hora','Revisado por','Emoji','Artículo','Categoría','Cantidad','Unidad','Tipo','Nota'];
+  const headers = [t('exp_h_date'),t('exp_h_time'),t('exp_h_checked_by'),t('exp_h_emoji'),t('exp_h_item'),t('exp_h_category'),t('exp_h_qty'),t('exp_h_unit'),t('exp_h_type'),t('exp_h_note')];
   const rows = lines
     .sort((a, b) => (meta[a.snapshot_id].date + (a.sort_order||0)).localeCompare(meta[b.snapshot_id].date + (b.sort_order||0)))
     .map(l => {
@@ -2122,15 +2571,15 @@ async function exportInventarioHistorial() {
       return [ m.date, m.time, m.by, l.emoji || '', l.item_name, l.category || '',
                l.quantity, l.unit || '', l.unit_type || '', m.note ];
     });
-  downloadCSV(`inventario-historial-${from}_${to}.csv`, headers, rows);
-  showToast(`✓ ${snaps.length} revisiones exportadas`);
+  downloadCSV(`${t('exp_file_inv_hist')}-${from}_${to}.csv`, headers, rows);
+  showToast(t('exp_msg_inv_hist',{n:snaps.length}));
 }
 
 // COLABORADOR BALANCE — Semana (hours) + Solicitudes
 async function renderColaboradorBalance() {
   const el=document.getElementById('admin-balance');
   if(!el) return;
-  el.innerHTML='<div class="empty">Cargando…</div>';
+  el.innerHTML=`<div class="empty">${t('loading')}</div>`;
 
   // Hours summary
   const {data:pesticeros}=await sb.from('profiles').select('*').eq('active',true).eq('role','pesticero');
@@ -2167,7 +2616,7 @@ async function renderColaboradorBalance() {
   if(!isRequestWindowOpen()){ html+=`<div style="font-size:13px;color:var(--text2);text-align:center;padding:1rem 0;">${t('period_info')}</div>`; }
   if(!requests||requests.length===0){ html+=`<div class="empty">${t('no_pending')}</div></div>`; }
   else {
-    requests.forEach(r=>{ const rate=RATES[r.user_id]||0; const dop=Math.round(r.hours_requested*rate); const typeLabel=r.type==='money'?t('type_money')+' · RD$ '+dop.toLocaleString():t('type_time'); html+=`<div class="request-card" id="req-${r.id}"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><strong style="font-size:14px;">${r.profiles?.name}</strong><span class="badge badge-primary">${t('pending_badge')}</span></div><div style="font-size:13px;color:var(--text2);">${typeLabel} · ${fmtDuration(r.hours_requested*60)}</div><div class="req-actions"><button class="btn-approve" onclick="handleRequest('${r.id}','approved')">${t('approve')}</button><button class="btn-deny" onclick="handleRequest('${r.id}','denied')">${t('deny')}</button></div></div>`; });
+    requests.forEach(r=>{ const rate=RATES[r.user_id]||0; const dop=Math.round(r.hours_requested*rate); const typeLabel=r.type==='money'?t('type_money')+' · '+t('unit_rd')+' '+dop.toLocaleString(loc()):t('type_time'); html+=`<div class="request-card" id="req-${r.id}"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><strong style="font-size:14px;">${r.profiles?.name}</strong><span class="badge badge-primary">${t('pending_badge')}</span></div><div style="font-size:13px;color:var(--text2);">${typeLabel} · ${fmtDuration(r.hours_requested*60)}</div><div class="req-actions"><button class="btn-approve" onclick="handleRequest('${r.id}','approved')">${t('approve')}</button><button class="btn-deny" onclick="handleRequest('${r.id}','denied')">${t('deny')}</button></div></div>`; });
     html+=`</div>`;
   }
 
@@ -2178,7 +2627,7 @@ async function toggleQuincenal(userId) {
   const el=document.getElementById('quincenal-'+userId);
   if(!el) return;
   if(el.style.display!=='none'){ el.style.display='none'; return; }
-  el.innerHTML='<div class="empty">Cargando…</div>';
+  el.innerHTML=`<div class="empty">${t('loading')}</div>`;
   el.style.display='block';
   // Current quincenal period
   const now=new Date(); const dom=now.getDate();
@@ -2190,9 +2639,9 @@ async function toggleQuincenal(userId) {
   const {data:allEntries}=await sb.from('time_entries').select('*').eq('user_id',userId).order('clock_in',{ascending:false});
   // Load absence overrides for this user (map by date -> record)
   const {data:ovrList}=await sb.from('attendance_overrides').select('*, creator:created_by(name)').eq('user_id',userId);
-  (ovrList||[]).forEach(o=>{ o.created_by_name=o.creator?.name?.split(' ')[0]||'colaborador'; });
+  (ovrList||[]).forEach(o=>{ o.created_by_name=o.creator?.name?.split(' ')[0]||t('lbl_colaborador_fallback'); });
   const ovrByDay={}; (ovrList||[]).forEach(o=>{ ovrByDay[o.date]=o; });
-  if((!allEntries||allEntries.length===0)&&(!ovrList||ovrList.length===0)){ el.innerHTML='<div class="empty">Sin registros</div>'; return; }
+  if((!allEntries||allEntries.length===0)&&(!ovrList||ovrList.length===0)){ el.innerHTML=`<div class="empty">${t('no_records')}</div>`; return; }
   // Build day map
   const byDay={};
   allEntries.forEach(e=>{ const d=e.clock_in.slice(0,10); if(!byDay[d]) byDay[d]=[]; byDay[d].push(e); });
@@ -2206,20 +2655,20 @@ async function toggleQuincenal(userId) {
   function renderDays(days) {
     let h='';
     days.forEach(day=>{
-      const dateLabel=new Date(day+'T12:00:00').toLocaleDateString('es',{weekday:'short',day:'numeric',month:'short'});
+      const dateLabel=new Date(day+'T12:00:00').toLocaleDateString(loc(),{weekday:'short',day:'numeric',month:'short'});
       const ovr=ovrByDay[day];
       const entries=byDay[day]||[];
       // Pure absence day (no fichaje): red row with who registered it + delete button
       if(ovr && entries.length===0){
-        const byName=(ovr.created_by_name||'colaborador');
+        const byName=(ovr.created_by_name||t('lbl_colaborador_fallback'));
         const noteHtml=ovr.note?` · ${ovr.note}`:'';
         h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:12px;color:var(--red);">⚠ ${dateLabel} · Ausencia injustificada</span>
+          <span style="font-size:12px;color:var(--red);">⚠ ${dateLabel} · ${t('abs_row_label')}</span>
           <span style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:12px;font-family:'DM Mono',monospace;color:var(--red);">−${fmtDuration(userDayTarget)}</span>
             <button onclick="deleteAbsence('${ovr.id}','${userId}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;">🗑</button>
           </span></div>
-          <div style="font-size:11px;color:var(--text3);padding:0 0 6px;">Registrado por ${byName}${noteHtml}</div>`;
+          <div style="font-size:11px;color:var(--text3);padding:0 0 6px;">${t('abs_recorded_by')} ${byName}${noteHtml}</div>`;
         return;
       }
       let worked=0;
@@ -2231,16 +2680,16 @@ async function toggleQuincenal(userId) {
     });
     return h;
   }
-  const periodLabel=`${curStartStr.slice(8)} – ${curEndStr.slice(8)} ${now.toLocaleString('es',{month:'short'})}`;
+  const periodLabel=`${curStartStr.slice(8)} – ${curEndStr.slice(8)} ${now.toLocaleString(loc(),{month:'short'})}`;
   let html=`<div style="padding:8px 0 4px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">${periodLabel}</div>`;
-  html+=curDays.length?renderDays(curDays):'<div style="font-size:12px;color:var(--text3);padding:6px 0;">Sin días trabajados</div>';
+  html+=curDays.length?renderDays(curDays):`<div style="font-size:12px;color:var(--text3);padding:6px 0;">${t('empty_no_workdays')}</div>`;
   if(histDays.length){
-    html+=`<button onclick="const hd=document.getElementById('hist-${userId}');hd.style.display=hd.style.display==='none'?'block':'none';this.textContent=hd.style.display==='none'?'▾ Ver historial completo':'▴ Ocultar'" style="font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;padding:6px 0;margin-top:4px;">▾ Ver historial completo</button>`;
+    html+=`<button onclick="const hd=document.getElementById('hist-${userId}');hd.style.display=hd.style.display==='none'?'block':'none';this.textContent=hd.style.display==='none'?t('btn_show_full_history'):t('btn_hide')" style="font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;padding:6px 0;margin-top:4px;">${t('btn_show_full_history')}</button>`;
     html+=`<div id="hist-${userId}" style="display:none;">${renderDays(histDays)}</div>`;
   }
   // Absence button — only colaborador may register
   if(currentProfile?.role==='colaborador'){
-    html+=`<button onclick="openAbsenceModal('${userId}')" style="font-size:12px;color:var(--red);background:none;border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:7px 10px;margin-top:10px;width:100%;">＋ Marcar ausencia injustificada</button>`;
+    html+=`<button onclick="openAbsenceModal('${userId}')" style="font-size:12px;color:var(--red);background:none;border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:7px 10px;margin-top:10px;width:100%;">${t('abs_btn_mark')}</button>`;
   }
   el.innerHTML=`<div style="padding:0 0 8px;">${html}</div>`;
 }
@@ -2261,25 +2710,25 @@ async function saveAbsence(){
   const userId=document.getElementById('ab-user-id').value;
   const date=document.getElementById('ab-date').value;
   const note=document.getElementById('ab-note').value.trim()||null;
-  if(!userId||!date){ showToast('Falta fecha'); return; }
+  if(!userId||!date){ showToast(t('err_no_date')); return; }
   const {data,error}=await sb.from('attendance_overrides')
     .insert({user_id:userId,date,note,created_by:currentUser.id})
     .select();
   if(error||!data||data.length===0){
-    showToast(error?.code==='23505'?'Ya existe una ausencia ese día':'Error al guardar');
+    showToast(error?.code==='23505'?t('abs_err_dup'):t('err_save'));
     return;
   }
-  showToast('Ausencia registrada');
+  showToast(t('abs_msg_saved'));
   closeAbsenceModal();
   // Refresh the open detail panel
   const panel=document.getElementById('quincenal-'+userId);
   if(panel){ panel.style.display='none'; toggleQuincenal(userId); }
 }
 function deleteAbsence(id, userId){
-  askDeletePin('Eliminar ausencia', async ()=>{
+  askDeletePin(t('abs_ttl_delete'), async ()=>{
     const {error}=await sb.from('attendance_overrides').delete().eq('id',id);
-    if(error){ showToast('Error al eliminar'); return; }
-    showToast('Ausencia eliminada');
+    if(error){ showToast(t('err_delete')); return; }
+    showToast(t('abs_msg_deleted'));
     const panel=document.getElementById('quincenal-'+userId);
     if(panel){ panel.style.display='none'; toggleQuincenal(userId); }
   });
@@ -2304,7 +2753,7 @@ async function saveExtraTask() {
   const inserts=persons.map(uid=>({name,date,duration_mins:dur,note,recurrence,assigned_to:uid,created_by:currentUser.id}));
   const {error}=await sb.from('extra_tasks').insert(inserts);
   if(error){showToast(t('err_save'));console.error(error);return;}
-  showToast('✓ Tarea guardada'); closeExtraModal(); await loadColaboradorDiario();
+  showToast(t('msg_task_saved')); closeExtraModal(); await loadColaboradorDiario();
 }
 
 async function loadExtraTasks(userId,date) {
@@ -2322,8 +2771,8 @@ function getWplanWeekStart() {
   return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
 }
 
-function getDayName(dow) { return ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][dow-1]||''; }
-function getDayNameShort(dow) { return ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][dow-1]||''; }
+function getDayName(dow) { return dow>=1&&dow<=7 ? dayName(dow) : ''; }
+function getDayNameShort(dow) { return dow>=1&&dow<=7 ? dayNameShort(dow) : ''; }
 function getTodayDow() { const d=new Date().getDay(); return d===0?7:d; }
 
 function getAllNonDailyTasks(scope) {
@@ -2357,7 +2806,7 @@ async function renderWeekPlanView(containerId, userId, isColaborador, scope) {
   let html='';
   if(!confirmed&&(planRows||[]).length>0){
     if(isColaborador){
-      html+=`<div style="background:var(--amber-light);border:1px solid rgba(156,98,0,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;color:var(--amber);">⚠ Plan pendiente de confirmación</span><button onclick="confirmWplan('${userId}','${weekStart}','${containerId}',${isColaborador})" style="font-size:12px;padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;">${t('confirm_plan')}</button></div>`;
+      html+=`<div style="background:var(--amber-light);border:1px solid rgba(156,98,0,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;color:var(--amber);">${t('wp_unconfirmed_short')}</span><button onclick="confirmWplan('${userId}','${weekStart}','${containerId}',${isColaborador})" style="font-size:12px;padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;">${t('confirm_plan')}</button></div>`;
     } else {
       html+=`<div style="background:var(--amber-light);border:1px solid rgba(156,98,0,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--amber);">${t('not_confirmed')}</div>`;
     }
@@ -2384,7 +2833,7 @@ async function renderWplanDay(containerId, userId, isColaborador, dow, weekStart
     const {data:comps}=await sb.from('task_completions').select('task_id,completed_at').eq('user_id',userId).eq('date',todayStr());
     (comps||[]).forEach(c=>{ if(c.completed_at) planDoneMap[c.task_id]=c.completed_at; });
   }
-  let html=`<div class="card"><div class="wplan-day-header"><span class="wplan-day-name">${getDayName(dow)}${dow===todayDow?'<span class="wplan-day-today">HOY</span>':''}</span>${isColaborador?`<button onclick="openWplanModal('${userId}',${dow},'${weekStart}','${containerId}')" style="font-size:12px;padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Agregar</button>`:''}</div>`;
+  let html=`<div class="card"><div class="wplan-day-header"><span class="wplan-day-name">${getDayName(dow)}${dow===todayDow?`<span class="wplan-day-today">${t('wp_today')}</span>`:''}</span>${isColaborador?`<button onclick="openWplanModal('${userId}',${dow},'${weekStart}','${containerId}')" style="font-size:12px;padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;">${t('add_to_plan')}</button>`:''}</div>`;
   if(dayTasks.length===0){
     html+=`<div class="empty" style="padding:1.5rem 0;">${t('no_plan')}</div>`;
   } else {
@@ -2402,7 +2851,7 @@ async function renderWplanDay(containerId, userId, isColaborador, dow, weekStart
       } else if(isColaborador){
         rightHtml=`<button onclick="deleteWplanTask('${task.id}','${containerId}','${userId}',${isColaborador},'${weekStart}')" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--red-light);color:var(--red);cursor:pointer;flex-shrink:0;">✕</button>`;
       }
-      html+=`<div class="wplan-item"><div style="flex:1;min-width:0;"><div class="wplan-item-name ${isDone?'done':''}">${task.task_name}</div><div class="wplan-item-meta">${task.start_time||'—'} · ${task.duration_mins?task.duration_mins+'min':'—'}${task.note?' · '+task.note:''}</div></div>${rightHtml}</div>`;
+      html+=`<div class="wplan-item"><div style="flex:1;min-width:0;"><div class="wplan-item-name ${isDone?'done':''}">${task.task_name}</div><div class="wplan-item-meta">${task.start_time||'—'} · ${task.duration_mins?task.duration_mins+t('unit_min'):'—'}${task.note?' · '+task.note:''}</div></div>${rightHtml}</div>`;
     });
   }
   html+=`</div>`;
@@ -2424,7 +2873,7 @@ async function confirmWplan(userId, weekStart, containerId, isColaborador) {
 }
 
 async function deleteWplanTask(taskId, containerId, userId, isColaborador, weekStart) {
-  askDeletePin('Eliminar tarea del plan', async () => {
+  askDeletePin(t('wp_ttl_delete_task'), async () => {
     await sb.from('week_plan').delete().eq('id',taskId);
     showToast(t('wplan_deleted'));
     const {data:planRows}=await sb.from('week_plan').select('*').eq('user_id',userId).eq('week_start',weekStart);
@@ -2442,7 +2891,7 @@ function openWplanModal(userId, dow, weekStart, containerId) {
   sel.innerHTML='';
   getAllNonDailyTasks(scope).forEach(task=>{
     const opt=document.createElement('option');
-    opt.value=task.id; opt.textContent=task.name+(task.dur?` · ${task.dur}min`:'');
+    opt.value=task.id; opt.textContent=task.name+(task.dur?` · ${task.dur}${t('unit_min')}`:'');
     opt.dataset.name=task.name; opt.dataset.dur=task.dur||'';
     sel.appendChild(opt);
   });
@@ -2454,7 +2903,7 @@ function openWplanModal(userId, dow, weekStart, containerId) {
   document.querySelector('#wplan-modal .rec-opt[data-val="existing"]').classList.add('selected');
   document.getElementById('wplan-existing-section').style.display='';
   document.getElementById('wplan-custom-section').style.display='none';
-  document.getElementById('wplan-modal-title').textContent=`${getDayName(dow)} · Agregar tarea`;
+  document.getElementById('wplan-modal-title').textContent=`${getDayName(dow)} · ${t('wp_ttl_add_task')}`;
   document.getElementById('wplan-modal').style.display='flex';
 }
 
@@ -2492,6 +2941,10 @@ async function saveWplanTask() {
 }
 
 // AUTO LOGIN
+// Render the auth screen in the language last used on this device, then let
+// initApp() switch to the profile language once the session is known.
+currentLang = localStorage.getItem(LANG_STORAGE_KEY)==='en' ? 'en' : 'es';
+applyStaticI18n();
 sb.auth.getSession().then(({data:{session}})=>{ if(session?.user) initApp(session.user); });
 
 
@@ -2505,7 +2958,7 @@ function fillHorseSelect(elId, selected) {
   if(!el) return;
   el.innerHTML = HORSES
     .filter(h => h.active || h.name === selected)
-    .map(h => `<option value="${h.name}"${h.name === selected ? ' selected' : ''}>${h.name}${h.active ? '' : ' (inactivo)'}</option>`)
+    .map(h => `<option value="${h.name}"${h.name === selected ? ' selected' : ''}>${h.name}${h.active ? '' : ' '+t('lbl_inactive')}</option>`)
     .join('');
 }
 
@@ -2520,15 +2973,15 @@ async function loadClientHistory(cid) {
     .order('date', {ascending:false})
     .limit(30);
   if(!sess || sess.length === 0){
-    el.innerHTML = '<div class="section-label">Historial de sesiones</div><div class="empty" style="padding:0.5rem 0;">Sin sesiones registradas.</div>';
+    el.innerHTML = `<div class="section-label">${t('cli_history_title')}</div><div class="empty" style="padding:0.5rem 0;">${t('cli_history_empty')}</div>`;
     return;
   }
-  let h = '<div class="section-label">Historial de sesiones</div><div class="card" style="padding:0;">';
+  let h = `<div class="section-label">${t('cli_history_title')}</div><div class="card" style="padding:0;">`;
   sess.forEach(x => {
     const att = x.attendance==='asistio'
-      ? '<span style="color:var(--green);">✓ Asistió</span>'
+      ? `<span style="color:var(--green);">${t('ag_att_present')}</span>`
       : x.attendance==='ausente'
-        ? '<span style="color:var(--red);">✗ Ausente</span>'
+        ? `<span style="color:var(--red);">${t('ag_att_absent')}</span>`
         : '<span style="color:var(--text3);">—</span>';
     const tipo = (x.session_type && x.session_type!=='regular') ? ' · '+x.session_type : '';
     h += `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:1px solid var(--border);font-size:12px;"><span>${fmtDateShort(x.date)}${tipo}</span><span>${att}</span></div>`;
@@ -2547,25 +3000,24 @@ function renderFinanzas() {
   const DRIVE_SALIDAS_URL = 'https://drive.google.com/drive/u/1/folders/18eLHrOtryjpZxe0rMyg9fNSGj8p8wSXY';
   el.innerHTML = `
     <div class="card">
-      <div class="card-title">Contabilidad · Alegra</div>
+      <div class="card-title">${t('fin_title')}</div>
       <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:12px;">
-        Alegra es el sistema oficial de contabilidad de la organización.
-        Los ingresos y gastos se registran allí, no en esta app.
+        ${t('fin_intro')}
       </div>
-      <a href="${ALEGRA_URL}" target="_blank" rel="noopener" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">Abrir Alegra →</a>
+      <a href="${ALEGRA_URL}" target="_blank" rel="noopener" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">${t('fin_btn_alegra')}</a>
     </div>
     <div class="card">
-      <div class="card-title">Facturas y recibos (salidas)</div>
+      <div class="card-title">${t('fin_invoices_title')}</div>
       <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:12px;">
-        Flujo para ordenar las facturas del mes con ayuda de Claude:
+        ${t('fin_flow_intro')}
       </div>
       <ol style="font-size:13px;color:var(--text2);line-height:1.6;margin:0 0 12px 0;padding-left:20px;">
-        <li>Guarda las fotos de las facturas en la carpeta de Drive.</li>
-        <li>Súbelas a tu chat de Claude (Claude Pro).</li>
-        <li>Pídele una lista ordenada de gastos (fecha, monto, concepto).</li>
-        <li>Registra los valores en Alegra y guarda la lista en Drive.</li>
+        <li>${t('fin_step_1')}</li>
+        <li>${t('fin_step_2')}</li>
+        <li>${t('fin_step_3')}</li>
+        <li>${t('fin_step_4')}</li>
       </ol>
-      <a href="${DRIVE_SALIDAS_URL}" target="_blank" rel="noopener" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">Abrir carpeta de salidas →</a>
+      <a href="${DRIVE_SALIDAS_URL}" target="_blank" rel="noopener" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">${t('fin_btn_drive')}</a>
     </div>`;
 }
 
@@ -2573,7 +3025,7 @@ function renderFinanzas() {
 async function renderInventario() {
   const el = document.getElementById('admin-inventario');
   if(!el) return;
-  el.innerHTML = '<div class="empty">Cargando…</div>';
+  el.innerHTML = `<div class="empty">${t('loading')}</div>`;
 
   const {data: items} = await sb.from('inventory_items').select('*').order('sort_order').order('name');
   const {data: lastSnap} = await sb.from('inventory_snapshots').select('*').order('taken_at',{ascending:false}).limit(1).maybeSingle();
@@ -2581,63 +3033,63 @@ async function renderInventario() {
   // --- Header: última revisión ---
   let html = `<div class="card">`;
   if(lastSnap){
-    html += `<div style="font-size:12px;color:var(--text3);">Última revisión</div>
-      <div style="font-size:14px;font-weight:600;margin-top:2px;">${fmtDateShort(lastSnap.taken_at.slice(0,10))} · ${new Date(lastSnap.taken_at).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}</div>
-      <div style="font-size:12px;color:var(--text2);">por ${lastSnap.taken_by||'—'}</div>`;
+    html += `<div style="font-size:12px;color:var(--text3);">${t('inv_last_check')}</div>
+      <div style="font-size:14px;font-weight:600;margin-top:2px;">${fmtDateShort(lastSnap.taken_at.slice(0,10))} · ${new Date(lastSnap.taken_at).toLocaleTimeString(loc(),{hour:'2-digit',minute:'2-digit'})}</div>
+      <div style="font-size:12px;color:var(--text2);">${t('lbl_by')} ${lastSnap.taken_by||'—'}</div>`;
   } else {
-    html += `<div style="font-size:13px;color:var(--text3);">Aún no hay revisiones guardadas.</div>`;
+    html += `<div style="font-size:13px;color:var(--text3);">${t('inv_no_checks')}</div>`;
   }
   html += `<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-      <button class="btn-primary" style="flex:1;min-width:130px;" onclick="takeSnapshot()">📸 Nueva revisión</button>
-      <button class="btn-primary" style="flex:1;min-width:130px;background:#1d6f63;" onclick="genInventoryWhatsApp()">💬 Generar texto</button>
+      <button class="btn-primary" style="flex:1;min-width:130px;" onclick="takeSnapshot()">${t('inv_btn_new_check')}</button>
+      <button class="btn-primary" style="flex:1;min-width:130px;background:#1d6f63;" onclick="genInventoryWhatsApp()">${t('inv_btn_gen_text')}</button>
     </div>
-    <button onclick="renderInventoryHistory()" style="margin-top:6px;width:100%;background:none;border:1px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:13px;color:var(--text2);">🕘 Ver historial</button>
+    <button onclick="renderInventoryHistory()" style="margin-top:6px;width:100%;background:none;border:1px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:13px;color:var(--text2);">${t('inv_btn_history')}</button>
   </div>`;
 
   // --- Add item form ---
-  html += `<div class="card"><div class="card-title">+ Artículo</div>
-    <div class="form-row" style="margin-bottom:6px;"><input class="form-input" id="iv-name" type="text" placeholder="Nombre (ej: Trigo)"></div>
+  html += `<div class="card"><div class="card-title">${t('inv_add_title')}</div>
+    <div class="form-row" style="margin-bottom:6px;"><input class="form-input" id="iv-name" type="text" placeholder="${t('inv_ph_name')}"></div>
     <div style="display:flex;gap:6px;margin-bottom:6px;">
       <input class="form-input" id="iv-emoji" type="text" placeholder="🌾" style="flex:1;text-align:center;" maxlength="3">
-      <input class="form-input" id="iv-category" type="text" placeholder="Categoría" style="flex:3;">
+      <input class="form-input" id="iv-category" type="text" placeholder="${t('lbl_category')}" style="flex:3;">
     </div>
     <div style="display:flex;gap:6px;margin-bottom:6px;">
-      <input class="form-input" id="iv-qty" type="number" inputmode="decimal" placeholder="Cantidad" style="flex:2;">
-      <input class="form-input" id="iv-unit" type="text" placeholder="%/sacos" style="flex:1;">
+      <input class="form-input" id="iv-qty" type="number" inputmode="decimal" placeholder="${t('lbl_quantity')}" style="flex:2;">
+      <input class="form-input" id="iv-unit" type="text" placeholder="${t('inv_ph_unit')}" style="flex:1;">
       <select class="form-input" id="iv-unittype" style="flex:1.4;">
-        <option value="count">N.º</option>
+        <option value="count">${t('inv_unit_count')}</option>
         <option value="pct">%</option>
-        <option value="free">Libre</option>
+        <option value="free">${t('inv_unit_free')}</option>
       </select>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:8px;">
-      <input class="form-input" id="iv-min" type="number" inputmode="decimal" placeholder="Alerta urgente <" style="flex:1;">
-      <input class="form-input" id="iv-week" type="number" inputmode="decimal" placeholder="Alerta semana <" style="flex:1;">
+      <input class="form-input" id="iv-min" type="number" inputmode="decimal" placeholder="${t('inv_ph_min')}" style="flex:1;">
+      <input class="form-input" id="iv-week" type="number" inputmode="decimal" placeholder="${t('inv_ph_week')}" style="flex:1;">
     </div>
-    <button class="btn-primary" onclick="addInventory()">Agregar →</button>
+    <button class="btn-primary" onclick="addInventory()">${t('btn_add')}</button>
   </div>`;
 
   // --- Items grouped by category, with alert badges ---
   if(!items || items.length===0){
-    html += '<div class="card"><div class="empty">Sin artículos.</div></div>';
+    html += `<div class="card"><div class="empty">${t('inv_empty')}</div></div>`;
   } else {
     const cats = {};
-    items.forEach(it => { (cats[it.category||'Otros'] = cats[it.category||'Otros']||[]).push(it); });
+    items.forEach(it => { (cats[it.category||t('inv_cat_other')] = cats[it.category||t('inv_cat_other')]||[]).push(it); });
     Object.keys(cats).forEach(cat => {
       html += `<div class="card" style="padding:0;"><div style="padding:10px 16px 6px;border-bottom:1px solid var(--border);"><div class="card-title" style="margin-bottom:0;">${cat}</div></div>`;
       cats[cat].forEach(it => {
         const alert = inventoryAlert(it); // '', 'urgent', 'week'
-        const badge = alert==='urgent' ? ' <span class="badge badge-red" style="font-size:9px;">🚨 urgente</span>'
-                    : alert==='week'   ? ' <span class="badge" style="font-size:9px;background:#f3d27a;color:#5a4400;">⚠️ semana</span>' : '';
+        const badge = alert==='urgent' ? ` <span class="badge badge-red" style="font-size:9px;">${t('inv_badge_urgent')}</span>`
+                    : alert==='week'   ? ` <span class="badge" style="font-size:9px;background:#f3d27a;color:#5a4400;">${t('inv_badge_week')}</span>` : '';
         const unitLabel = it.unit ? ' '+it.unit : '';
         html += `<div id="iv-row-${it.id}" style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:8px;">
           <div style="flex:1;min-width:0;">
             <div style="font-size:14px;font-weight:500;">${it.emoji?it.emoji+' ':''}${it.name}<span id="iv-badge-${it.id}">${badge}</span></div>
-            <div style="font-size:11px;color:var(--text3);">${it.unit_type==='free'?'libre':it.unit_type}${it.min_stock!=null?' · urgente<'+it.min_stock:''}${it.threshold_week!=null?' · semana<'+it.threshold_week:''}</div>
+            <div style="font-size:11px;color:var(--text3);">${it.unit_type==='free'?t('inv_unit_free_low'):it.unit_type}${it.min_stock!=null?' · '+t('inv_meta_urgent')+it.min_stock:''}${it.threshold_week!=null?' · '+t('inv_meta_week')+it.threshold_week:''}</div>
           </div>
           <input type="number" inputmode="decimal" value="${Number(it.quantity)}" onchange="setInventoryQty('${it.id}', this.value)" style="width:64px;text-align:center;font-family:'DM Mono',monospace;font-size:14px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg);flex-shrink:0;">
           <div style="font-size:12px;color:var(--text3);min-width:38px;">${it.unit||''}</div>
-          <button onclick="deleteInventory('${it.id}')" title="Eliminar" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--text3);flex-shrink:0;">🗑</button>
+          <button onclick="deleteInventory('${it.id}')" title="${t('btn_delete_title')}" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--text3);flex-shrink:0;">🗑</button>
         </div>`;
       });
       html += '</div>';
@@ -2657,7 +3109,7 @@ function inventoryAlert(it){
 
 async function addInventory() {
   const name = document.getElementById('iv-name').value.trim();
-  if(!name){ showToast('⚠ Escribe el nombre'); return; }
+  if(!name){ showToast(t('err_name')); return; }
   const emoji = document.getElementById('iv-emoji').value.trim() || null;
   const category = document.getElementById('iv-category').value.trim() || null;
   const quantity = parseFloat(document.getElementById('iv-qty').value) || 0;
@@ -2669,41 +3121,41 @@ async function addInventory() {
   const threshold_week = weekv === '' ? null : parseFloat(weekv);
   const {data, error} = await sb.from('inventory_items')
     .insert({name, emoji, category, quantity, unit, unit_type, min_stock, threshold_week}).select();
-  if(error){ showToast('Error al guardar'); console.error(error); return; }
-  if(!data || data.length===0){ showToast('⚠ Sin permiso (RLS)'); return; }
+  if(error){ showToast(t('err_save')); console.error(error); return; }
+  if(!data || data.length===0){ showToast(t('err_rls')); return; }
   showToast('✓ Agregado'); await renderInventario();
 }
 
 // --- Snapshot: freeze current live stock as a revisión ---
 async function takeSnapshot() {
-  const note = prompt('Nota / observaciones (opcional):', '') || null;
+  const note = prompt(t('inv_prompt_note'), '') || null;
   const {data: items} = await sb.from('inventory_items').select('*').order('sort_order').order('name');
-  if(!items || items.length===0){ showToast('⚠ Sin artículos'); return; }
+  if(!items || items.length===0){ showToast(t('inv_err_no_items')); return; }
   const {data: snap, error: e1} = await sb.from('inventory_snapshots')
     .insert({taken_by: currentProfile.name || '—', note}).select();
-  if(e1 || !snap || snap.length===0){ showToast('⚠ Sin permiso (RLS)'); return; }
+  if(e1 || !snap || snap.length===0){ showToast(t('err_rls')); return; }
   const snapId = snap[0].id;
   const lines = items.map(it => ({
     snapshot_id: snapId, item_name: it.name, emoji: it.emoji, category: it.category,
     quantity: it.quantity, unit: it.unit, unit_type: it.unit_type, sort_order: it.sort_order
   }));
   const {data: ld, error: e2} = await sb.from('inventory_snapshot_lines').insert(lines).select();
-  if(e2 || !ld || ld.length===0){ showToast('⚠ Error al guardar líneas'); return; }
-  showToast('📸 Revisión guardada'); await renderInventario();
+  if(e2 || !ld || ld.length===0){ showToast(t('inv_err_lines')); return; }
+  showToast(t('inv_msg_saved')); await renderInventario();
 }
 
 // --- Generate WhatsApp text from current live stock ---
 async function genInventoryWhatsApp() {
   const {data: items} = await sb.from('inventory_items').select('*').order('sort_order').order('name');
-  if(!items || items.length===0){ showToast('⚠ Sin artículos'); return; }
+  if(!items || items.length===0){ showToast(t('inv_err_no_items')); return; }
   const now = new Date();
-  const fecha = now.toLocaleDateString('es', {day:'2-digit',month:'2-digit',year:'numeric'});
-  const hora = now.toLocaleTimeString('es', {hour:'2-digit',minute:'2-digit'});
+  const fecha = now.toLocaleDateString(loc(), {day:'2-digit',month:'2-digit',year:'numeric'});
+  const hora = now.toLocaleTimeString(loc(), {hour:'2-digit',minute:'2-digit'});
   const bar = '━━━━━━━━━━━━━━━━━━━━';
-  let txt = `📦 INVENTARIO GENERAL – EVV\nFecha: ${fecha}\nHora: ${hora}\nRevisado por: ${currentProfile.name||'—'}\n${bar}\n📦 INVENTARIO ACTUAL\n${bar}\n`;
+  let txt = `${t('wa_header')}\n${t('wa_date')}: ${fecha}\n${t('wa_time')}: ${hora}\n${t('wa_by')}: ${currentProfile.name||'—'}\n${bar}\n${t('wa_current')}\n${bar}\n`;
   // group by category
   const cats = {};
-  items.forEach(it => { (cats[it.category||'Otros'] = cats[it.category||'Otros']||[]).push(it); });
+  items.forEach(it => { (cats[it.category||t('inv_cat_other')] = cats[it.category||t('inv_cat_other')]||[]).push(it); });
   Object.keys(cats).forEach(cat => {
     txt += `\n${cat}\n`;
     cats[cat].forEach(it => {
@@ -2714,15 +3166,15 @@ async function genInventoryWhatsApp() {
   // alerts
   const urgent = items.filter(it => inventoryAlert(it)==='urgent');
   const week   = items.filter(it => inventoryAlert(it)==='week');
-  txt += `${bar}\n🚨 ALERTAS DE COMPRA\n${bar}\n`;
-  if(urgent.length){ txt += `Comprar urgente\n`; urgent.forEach((it,i)=> txt += `${i+1}. ${it.name}\n`); }
-  if(week.length){ txt += `Comprar esta semana\n`; week.forEach((it,i)=> txt += `${i+1}. ${it.name}\n`); }
-  if(!urgent.length && !week.length) txt += `Sin alertas.\n`;
+  txt += `${bar}\n${t('wa_alerts')}\n${bar}\n`;
+  if(urgent.length){ txt += `${t('wa_buy_urgent')}\n`; urgent.forEach((it,i)=> txt += `${i+1}. ${it.name}\n`); }
+  if(week.length){ txt += `${t('wa_buy_week')}\n`; week.forEach((it,i)=> txt += `${i+1}. ${it.name}\n`); }
+  if(!urgent.length && !week.length) txt += `${t('wa_no_alerts')}\n`;
   // copy to clipboard
-  try { await navigator.clipboard.writeText(txt); showToast('💬 Texto copiado'); }
-  catch(e){ showToast('Copia manual abajo'); }
+  try { await navigator.clipboard.writeText(txt); showToast(t('inv_msg_copied')); }
+  catch(e){ showToast(t('inv_msg_copy_manual')); }
   // also show in history modal for manual copy
-  document.getElementById('history-modal-title').textContent = 'Texto para WhatsApp';
+  document.getElementById('history-modal-title').textContent = t('inv_wa_title');
   document.getElementById('history-modal-content').innerHTML =
     `<textarea readonly style="width:100%;height:340px;font-family:monospace;font-size:12px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);resize:vertical;">${txt.replace(/</g,'&lt;')}</textarea>`;
   document.getElementById('history-modal').style.display='flex';
@@ -2730,18 +3182,18 @@ async function genInventoryWhatsApp() {
 
 // --- History: list past revisiones ---
 async function renderInventoryHistory() {
-  document.getElementById('history-modal-title').textContent = 'Historial de revisiones';
-  document.getElementById('history-modal-content').innerHTML = '<div class="empty">Cargando…</div>';
+  document.getElementById('history-modal-title').textContent = t('inv_history_title');
+  document.getElementById('history-modal-content').innerHTML = `<div class="empty">${t('loading')}</div>`;
   document.getElementById('history-modal').style.display='flex';
   const {data: snaps} = await sb.from('inventory_snapshots').select('*').order('taken_at',{ascending:false}).limit(30);
-  if(!snaps || snaps.length===0){ document.getElementById('history-modal-content').innerHTML='<div class="empty">Sin revisiones aún.</div>'; return; }
+  if(!snaps || snaps.length===0){ document.getElementById('history-modal-content').innerHTML=`<div class="empty">${t('inv_history_empty')}</div>`; return; }
   let html = '';
   snaps.forEach(s => {
     const d = fmtDateShort(s.taken_at.slice(0,10));
-    const h = new Date(s.taken_at).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+    const h = new Date(s.taken_at).toLocaleTimeString(loc(),{hour:'2-digit',minute:'2-digit'});
     html += `<div onclick="viewSnapshot('${s.id}')" style="padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;">
       <div style="font-size:14px;font-weight:600;">${d} · ${h}</div>
-      <div style="font-size:12px;color:var(--text2);">por ${s.taken_by||'—'}</div>
+      <div style="font-size:12px;color:var(--text2);">${t('lbl_by')} ${s.taken_by||'—'}</div>
       ${s.note?`<div style="font-size:12px;color:var(--text3);margin-top:4px;">📋 ${s.note}</div>`:''}
     </div>`;
   });
@@ -2750,12 +3202,12 @@ async function renderInventoryHistory() {
 
 // --- View one past snapshot ---
 async function viewSnapshot(id) {
-  document.getElementById('history-modal-content').innerHTML = '<div class="empty">Cargando…</div>';
+  document.getElementById('history-modal-content').innerHTML = `<div class="empty">${t('loading')}</div>`;
   const {data: lines} = await sb.from('inventory_snapshot_lines').select('*').eq('snapshot_id', id).order('sort_order');
-  if(!lines || lines.length===0){ document.getElementById('history-modal-content').innerHTML='<div class="empty">Vacío.</div>'; return; }
+  if(!lines || lines.length===0){ document.getElementById('history-modal-content').innerHTML=`<div class="empty">${t('empty_void')}</div>`; return; }
   const cats = {};
-  lines.forEach(l => { (cats[l.category||'Otros'] = cats[l.category||'Otros']||[]).push(l); });
-  let html = `<button onclick="renderInventoryHistory()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;margin-bottom:8px;">← Volver</button>`;
+  lines.forEach(l => { (cats[l.category||t('inv_cat_other')] = cats[l.category||t('inv_cat_other')]||[]).push(l); });
+  let html = `<button onclick="renderInventoryHistory()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;margin-bottom:8px;">${t('btn_back')}</button>`;
   Object.keys(cats).forEach(cat => {
     html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 4px;">${cat}</div>`;
     cats[cat].forEach(l => {
@@ -2771,20 +3223,20 @@ async function setInventoryQty(id, val) {
   const {data, error} = await sb.from('inventory_items')
     .update({quantity:q, updated_at:new Date().toISOString()})
     .eq('id', id).select();
-  if(error || !data || data.length===0){ showToast(error?'Error':'⚠ Sin permiso (RLS)'); return; }
+  if(error || !data || data.length===0){ showToast(error?t('err_generic'):t('err_rls')); return; }
   const it = data[0];
   const alert = inventoryAlert(it);
-  const badge = alert==='urgent' ? ' <span class="badge badge-red" style="font-size:9px;">🚨 urgente</span>'
-              : alert==='week'   ? ' <span class="badge" style="font-size:9px;background:#f3d27a;color:#5a4400;">⚠️ semana</span>' : '';
+  const badge = alert==='urgent' ? ` <span class="badge badge-red" style="font-size:9px;">${t('inv_badge_urgent')}</span>`
+              : alert==='week'   ? ` <span class="badge" style="font-size:9px;background:#f3d27a;color:#5a4400;">${t('inv_badge_week')}</span>` : '';
   const badgeEl = document.getElementById('iv-badge-'+id);
   if(badgeEl) badgeEl.innerHTML = badge;
 }
 
 async function deleteInventory(id) {
-  askDeletePin('Eliminar artículo', async () => {
+  askDeletePin(t('inv_ttl_delete'), async () => {
     const {error} = await sb.from('inventory_items').delete().eq('id', id);
-    if(error){ showToast('Error'); console.error(error); return; }
-    showToast('✓ Eliminado'); await renderInventario();
+    if(error){ showToast(t('err_generic')); console.error(error); return; }
+    showToast(t('msg_deleted')); await renderInventario();
   });
 }
 
