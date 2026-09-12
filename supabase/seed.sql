@@ -142,41 +142,41 @@ from public.clients where name = 'Isabella Rojas';
 -- and splits the views by scope: 'finca' = pesticero, 'oficina' = coordinador.
 -- ============================================================
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'feed-horses-am', 'Alimentar caballos (mañana)', 'daily', 1, 'finca', 'individual', id, 'pesticero', '07:00', 30, 1
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'feed-horses-am', 'Alimentar caballos (mañana)', 'Feed horses (morning)', 'daily', 1, 'finca', 'individual', id, 'pesticero', '07:00', 30, 1
 from public.profiles where name = 'Luis Fernández';
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'clean-stalls', 'Limpiar establos', 'daily', 1, 'finca', 'individual', id, 'pesticero', '08:00', 45, 2
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'clean-stalls', 'Limpiar establos', 'Muck out stalls', 'daily', 1, 'finca', 'individual', id, 'pesticero', '08:00', 45, 2
 from public.profiles where name = 'Luis Fernández';
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'prep-session-material', 'Preparar material de sesión', 'daily', 1, 'finca', 'individual', id, 'pesticero', '08:30', 20, 3
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'prep-session-material', 'Preparar material de sesión', 'Prepare session equipment', 'daily', 1, 'finca', 'individual', id, 'pesticero', '08:30', 20, 3
 from public.profiles where name = 'Sofía Ramírez';
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'feed-horses-pm', 'Alimentar caballos (tarde)', 'daily', 1, 'finca', 'individual', id, 'pesticero', '16:00', 30, 4
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'feed-horses-pm', 'Alimentar caballos (tarde)', 'Feed horses (afternoon)', 'daily', 1, 'finca', 'individual', id, 'pesticero', '16:00', 30, 4
 from public.profiles where name = 'Sofía Ramírez';
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'weekly-tack-check', 'Revisar y limpiar monturas', 'weekly', 1, 'finca', 'shared', id, 'pesticero', '16:00', 60, 5
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'weekly-tack-check', 'Revisar y limpiar monturas', 'Check and clean tack', 'weekly', 1, 'finca', 'shared', id, 'pesticero', '16:00', 60, 5
 from public.profiles where name = 'Luis Fernández';
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'biweekly-paddock-check', 'Revisión de cercas y potreros', 'biweekly', 1, 'finca', 'shared', id, 'pesticero', '15:00', 90, 6
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'biweekly-paddock-check', 'Revisión de cercas y potreros', 'Fence and paddock check', 'biweekly', 1, 'finca', 'shared', id, 'pesticero', '15:00', 90, 6
 from public.profiles where name = 'Sofía Ramírez';
 
 -- Office scope -> coordinador view
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'office-agenda-review', 'Revisar agenda de terapias', 'daily', 1, 'oficina', 'individual', id, 'coordinador', '08:30', 30, 1
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'office-agenda-review', 'Revisar agenda de terapias', 'Review therapy schedule', 'daily', 1, 'oficina', 'individual', id, 'coordinador', '08:30', 30, 1
 from public.profiles where name = 'Carmen Díaz';
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'office-family-calls', 'Llamadas de seguimiento a familias', 'daily', 1, 'oficina', 'individual', id, 'coordinador', '11:00', 45, 2
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'office-family-calls', 'Llamadas de seguimiento a familias', 'Follow-up calls to families', 'daily', 1, 'oficina', 'individual', id, 'coordinador', '11:00', 45, 2
 from public.profiles where name = 'Carmen Díaz';
 
-insert into public.tasks (id, name, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
-select 'monthly-inventory-count', 'Conteo mensual de inventario', 'monthly', 1, 'oficina', 'individual', id, 'coordinador', '10:00', 90, 3
+insert into public.tasks (id, name, name_en, cadence, frequency_count, scope, completion_mode, assignee_id, target_role, default_time, duration_mins, sort_order)
+select 'monthly-inventory-count', 'Conteo mensual de inventario', 'Monthly stock count', 'monthly', 1, 'oficina', 'individual', id, 'coordinador', '10:00', 90, 3
 from public.profiles where name = 'Carmen Díaz';
 
 -- Completions for the last 7 days, always by the task's own assignee.
@@ -193,7 +193,7 @@ select t.assignee_id, t.id, 'weekly', (current_date - 7), (current_date - 7) + t
 from public.tasks t where t.id = 'weekly-tack-check';
 
 -- ============================================================
--- VOLUNTEER POOL (task_id is a free-text key, name_en drives the EN toggle)
+-- VOLUNTEER POOL (task_id is a free-text key; name_en drives the EN toggle, as in tasks)
 -- ============================================================
 
 insert into public.volunteer_pool (task_id, name, name_en, sort, active) values
@@ -215,13 +215,13 @@ from public.profiles where name = 'Carlos Gómez';
 -- WEEK PLAN (start_time is plain text 'HH:MM')
 -- ============================================================
 
-insert into public.week_plan (user_id, task_name, task_id, day_of_week, week_start, start_time, duration_mins, confirmed, created_by)
-select p.id, 'Revisar y limpiar monturas', 'weekly-tack-check', 3, date_trunc('week', current_date::timestamp)::date, '16:00', 60, true, a.id
+insert into public.week_plan (user_id, task_name, task_name_en, task_id, day_of_week, week_start, start_time, duration_mins, confirmed, created_by)
+select p.id, 'Revisar y limpiar monturas', 'Check and clean tack', 'weekly-tack-check', 3, date_trunc('week', current_date::timestamp)::date, '16:00', 60, true, a.id
 from public.profiles p, public.profiles a
 where p.name = 'Luis Fernández' and a.name = 'Ana Martínez';
 
-insert into public.week_plan (user_id, task_name, task_id, day_of_week, week_start, start_time, duration_mins, confirmed, created_by)
-select p.id, 'Revisión de cercas y potreros', 'biweekly-paddock-check', 5, date_trunc('week', current_date::timestamp)::date, '15:00', 90, false, a.id
+insert into public.week_plan (user_id, task_name, task_name_en, task_id, day_of_week, week_start, start_time, duration_mins, confirmed, created_by)
+select p.id, 'Revisión de cercas y potreros', 'Fence and paddock check', 'biweekly-paddock-check', 5, date_trunc('week', current_date::timestamp)::date, '15:00', 90, false, a.id
 from public.profiles p, public.profiles a
 where p.name = 'Sofía Ramírez' and a.name = 'Ana Martínez';
 
@@ -229,8 +229,8 @@ where p.name = 'Sofía Ramírez' and a.name = 'Ana Martínez';
 -- EXTRA TASKS
 -- ============================================================
 
-insert into public.extra_tasks (assigned_to, created_by, name, date, duration_mins, note, recurrence)
-select l.id, a.id, 'Reparar cerca del picadero', current_date, 90, 'Sección norte (ficticio).', 'once'
+insert into public.extra_tasks (assigned_to, created_by, name, name_en, date, duration_mins, note, recurrence)
+select l.id, a.id, 'Reparar cerca del picadero', 'Repair the arena fence', current_date, 90, 'Sección norte (ficticio).', 'once'
 from public.profiles l, public.profiles a
 where l.name = 'Luis Fernández' and a.name = 'Ana Martínez';
 
@@ -290,14 +290,14 @@ where s.name = 'Sofía Ramírez' and a.name = 'Ana Martínez';
 -- INVENTORY (unit_type: 'count' default, 'pct' for level-style items, 'free' for free text)
 -- ============================================================
 
-insert into public.inventory_items (name, category, quantity, unit, min_stock, threshold_week, emoji, unit_type, sort_order) values
-  ('Heno',               'Alimentación', 40, 'pacas',    10, 12, '🌾', 'count', 1),
-  ('Concentrado equino', 'Alimentación', 18, 'sacos',     6,  8, '🥣', 'count', 2),
-  ('Silo de alimento',   'Alimentación', 65, '%',       null, null, '🛢', 'pct',   3),
-  ('Cascos de repuesto', 'Equipo',        6, 'unidades',  2, null, '🐴', 'count', 4),
-  ('Guantes de trabajo', 'Equipo',       15, 'pares',     5, null, '🧤', 'count', 5),
-  ('Cepillos de aseo',   'Equipo',       10, 'unidades',  3, null, '🧹', 'count', 6),
-  ('Botiquín',           'Salud',         1, 'kit',       1, null, '🩹', 'free',  7);
+insert into public.inventory_items (name, name_en, category, category_en, quantity, unit, unit_en, min_stock, threshold_week, emoji, unit_type, sort_order) values
+  ('Heno',               'Hay',                     'Alimentación', 'Feed',      40, 'pacas',    'bales', 10, 12, '🌾', 'count', 1),
+  ('Concentrado equino', 'Equine concentrate feed', 'Alimentación', 'Feed',      18, 'sacos',    'sacks',  6,  8, '🥣', 'count', 2),
+  ('Silo de alimento',   'Feed silo',               'Alimentación', 'Feed',      65, '%',        '%',    null, null, '🛢', 'pct',   3),
+  ('Cascos de repuesto', 'Spare helmets',           'Equipo',       'Equipment',  6, 'unidades', 'units',  2, null, '🐴', 'count', 4),
+  ('Guantes de trabajo', 'Work gloves',             'Equipo',       'Equipment', 15, 'pares',    'pairs',  5, null, '🧤', 'count', 5),
+  ('Cepillos de aseo',   'Grooming brushes',        'Equipo',       'Equipment', 10, 'unidades', 'units',  3, null, '🧹', 'count', 6),
+  ('Botiquín',           'First-aid kit',           'Salud',        'Health',     1, 'kit',      'kit',    1, null, '🩹', 'free',  7);
 
 insert into public.inventory_snapshots (taken_by, note, taken_at)
 values ('Carmen Díaz', 'Conteo mensual (ficticio)', now() - interval '20 days');

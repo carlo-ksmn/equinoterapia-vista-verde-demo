@@ -96,9 +96,9 @@ async function loadCatalogs() {
   (tk.data||[]).forEach(r=>{
     if(r.cadence==='daily'){
       // slice(0,5): keep HH:MM identical to the old text time_slot format
-      (DAILY_BY_USER[r.assignee_id]=DAILY_BY_USER[r.assignee_id]||[]).push({id:r.id,time:(r.default_time||'').slice(0,5),dur:r.duration_mins,name:r.name});
+      (DAILY_BY_USER[r.assignee_id]=DAILY_BY_USER[r.assignee_id]||[]).push({id:r.id,time:(r.default_time||'').slice(0,5),dur:r.duration_mins,name:r.name,name_en:r.name_en});
     } else if(RECURRING[r.cadence]){
-      RECURRING[r.cadence].push({id:r.id,name:r.name,dur:r.duration_mins,freq:r.frequency_count,user_id:r.assignee_id,mode:r.completion_mode});
+      RECURRING[r.cadence].push({id:r.id,name:r.name,name_en:r.name_en,dur:r.duration_mins,freq:r.frequency_count,user_id:r.assignee_id,mode:r.completion_mode});
     }
   });
   // Same distribution for scope 'oficina' into the parallel globals
@@ -106,9 +106,9 @@ async function loadCatalogs() {
   RECURRING_OFICINA = { weekly: [], biweekly: [], monthly: [] };
   (tko.data||[]).forEach(r=>{
     if(r.cadence==='daily'){
-      (DAILY_BY_USER_OFICINA[r.assignee_id]=DAILY_BY_USER_OFICINA[r.assignee_id]||[]).push({id:r.id,time:(r.default_time||'').slice(0,5),dur:r.duration_mins,name:r.name});
+      (DAILY_BY_USER_OFICINA[r.assignee_id]=DAILY_BY_USER_OFICINA[r.assignee_id]||[]).push({id:r.id,time:(r.default_time||'').slice(0,5),dur:r.duration_mins,name:r.name,name_en:r.name_en});
     } else if(RECURRING_OFICINA[r.cadence]){
-      RECURRING_OFICINA[r.cadence].push({id:r.id,name:r.name,dur:r.duration_mins,freq:r.frequency_count,user_id:r.assignee_id,mode:r.completion_mode});
+      RECURRING_OFICINA[r.cadence].push({id:r.id,name:r.name,name_en:r.name_en,dur:r.duration_mins,freq:r.frequency_count,user_id:r.assignee_id,mode:r.completion_mode});
     }
   });
   VOLUNTEER_POOL = (vp.data||[]).map(r=>({id:r.task_id,name:r.name,name_en:r.name_en}));
@@ -947,8 +947,8 @@ async function renderDailyPlan() {
   const {data:extraCompletions}=await sb.from('task_completions').select('*').eq('user_id',currentUser.id).eq('date',today).eq('task_type','extra');
   const extraDoneMap={}; (extraCompletions||[]).forEach(c=>{extraDoneMap[c.task_id]=c.completed_at;});
   let html=`<div class="card-title">${t('daily_plan')}</div>`; const now=new Date();
-  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=task.name; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+t('unit_min')+' '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+t('unit_min')+'</div>'+statusHtml+'</div></div>'; });
-  extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const ck2=isDone?'':'completeTask(\''+task.id+'\',\'extra\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck2+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+task.name+'<span class="extra-badge">'+t('rec_once')+'</span></div><div class="task-target">'+(task.duration_mins?task.duration_mins+t('unit_min'):'—')+(task.note?' · '+task.note:'')+'</div>'+(isDone?'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(extraDoneMap[task.id])+'</div>':'')+'</div></div>'; });
+  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=locName(task); const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+t('unit_min')+' '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+t('unit_min')+'</div>'+statusHtml+'</div></div>'; });
+  extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const ck2=isDone?'':'completeTask(\''+task.id+'\',\'extra\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck2+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+locName(task)+'<span class="extra-badge">'+t('rec_once')+'</span></div><div class="task-target">'+(task.duration_mins?task.duration_mins+t('unit_min'):'—')+(task.note?' · '+task.note:'')+'</div>'+(isDone?'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(extraDoneMap[task.id])+'</div>':'')+'</div></div>'; });
   document.getElementById('plan-card').innerHTML=html;
 }
 
@@ -961,7 +961,7 @@ async function renderOficinaDailyPlan() {
   const doneMap={}; (completions||[]).forEach(c=>{doneMap[c.task_id]=c.completed_at;});
   let html=`<div class="card-title">${t('daily_plan')}</div>`; const now=new Date();
   if(tasks.length===0){ html+=`<div class="empty">—</div>`; }
-  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=task.name; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+t('unit_min')+' '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+t('unit_min')+'</div>'+statusHtml+'</div></div>'; });
+  tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=locName(task); const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+t('unit_min')+' '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+t('unit_min')+'</div>'+statusHtml+'</div></div>'; });
   el.innerHTML=html;
 }
 
@@ -1037,7 +1037,7 @@ async function renderPesticeroSemanal() {
     const byHtml=doneBy.length&&!isDoneToday?' · <span style="color:var(--green);font-size:10px;">'+doneBy.map(d=>d.name+' '+fmtTime(d.time)).join(', ')+'</span>':'';
     const freqLabel=task.freq>1?(doneCount+'/'+task.freq+t('unit_per_week')):(satisfied?'✓':(onToday?t('today'):t('this_week')));
     const durLabel=task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min');
-    html+=recurringRowHTML({name:task.name,cadence:'weekly',meta:`${durLabel} · ${freqLabel}${byHtml}`,isDone:isDoneToday||dimDone,rightHTML:recurringRightHTML(task.id,'weekly',onToday,isDoneToday,dimDone)});
+    html+=recurringRowHTML({name:locName(task),cadence:'weekly',meta:`${durLabel} · ${freqLabel}${byHtml}`,isDone:isDoneToday||dimDone,rightHTML:recurringRightHTML(task.id,'weekly',onToday,isDoneToday,dimDone)});
   });
   html+=`</div>`;
 
@@ -1048,7 +1048,7 @@ async function renderPesticeroSemanal() {
     const onToday=myBiTodayIds.has(task.id); const isDoneToday=!!myBiDoneMap[task.id];
     const dimDone=satisfied&&!onToday;
     const byHtml=doneBy.length&&!isDoneToday?' · <span style="color:var(--green);font-size:10px;">'+doneBy.map(d=>d.name+' '+fmtTime(d.time)).join(', ')+'</span>':'';
-    html+=recurringRowHTML({name:task.name,cadence:'biweekly',meta:`${task.dur}${t('unit_min')}${byHtml}`,isDone:isDoneToday||dimDone,rightHTML:recurringRightHTML(task.id,'biweekly',onToday,isDoneToday,dimDone)});
+    html+=recurringRowHTML({name:locName(task),cadence:'biweekly',meta:`${task.dur}${t('unit_min')}${byHtml}`,isDone:isDoneToday||dimDone,rightHTML:recurringRightHTML(task.id,'biweekly',onToday,isDoneToday,dimDone)});
   });
   html+=`</div>`;
 
@@ -1059,7 +1059,7 @@ async function renderPesticeroSemanal() {
       const satisfied=!!monthlyDoneMap[task.id]; const onToday=myMonthTodayIds.has(task.id);
       const dimDone=satisfied&&!onToday;
       const doneTimeHtml=satisfied?' · <span style="color:var(--green);font-size:10px;">'+fmtTime(monthlyDoneMap[task.id])+'</span>':'';
-      html+=recurringRowHTML({name:task.name,cadence:'monthly',meta:`${task.dur}${t('unit_min')}${doneTimeHtml}`,isDone:satisfied,rightHTML:recurringRightHTML(task.id,'monthly',onToday,satisfied,dimDone)});
+      html+=recurringRowHTML({name:locName(task),cadence:'monthly',meta:`${task.dur}${t('unit_min')}${doneTimeHtml}`,isDone:satisfied,rightHTML:recurringRightHTML(task.id,'monthly',onToday,satisfied,dimDone)});
     });
     html+=`</div>`;
   }
@@ -1243,9 +1243,14 @@ async function refreshVolunteerTimeState() {
   }
 }
 
-// Display name for a pool task: English column if present, Spanish fallback.
-function taskDisplayName(task) {
-  return (currentLang === 'en' && task.name_en) ? task.name_en : task.name;
+// Display value for staff-entered content. Returns the English column when English
+// is active and that column is filled, the Spanish original otherwise. `field` names
+// the Spanish column ('name', 'task_name', 'item_name', 'category', 'unit'); the
+// English one is that name plus '_en'. Content created in the app carries no
+// translation, so it keeps showing Spanish in both languages.
+function locName(row, field) {
+  const f = field || 'name';
+  return (currentLang === 'en' && row[f + '_en']) ? row[f + '_en'] : row[f];
 }
 
 async function renderVolunteerTareas() {
@@ -1261,7 +1266,7 @@ async function renderVolunteerTareas() {
   let html='<div class="card" style="padding:0;"><div style="padding:10px 16px 6px;border-bottom:1px solid var(--border);"><div class="card-title" style="margin-bottom:0;">'+t('pool_title')+'</div></div>';
   rows.forEach(r=>{
     const info=r.last?`${t('last_time')} ${fmtDateShort(r.last.date)} · ${r.last.name||'?'}`:t('never');
-    html+=`<div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:12px;"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${taskDisplayName(r.task)}</div><div style="font-size:11px;color:var(--text3);">${info}</div></div><button onclick="completeTask('${r.task.id}','vol_pool')" style="font-size:12px;padding:6px 14px;border-radius:20px;border:1.5px solid var(--green);color:var(--green);background:transparent;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;flex-shrink:0;">${t('done_btn')}</button></div>`;
+    html+=`<div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:12px;"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${locName(r.task)}</div><div style="font-size:11px;color:var(--text3);">${info}</div></div><button onclick="completeTask('${r.task.id}','vol_pool')" style="font-size:12px;padding:6px 14px;border-radius:20px;border:1.5px solid var(--green);color:var(--green);background:transparent;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;flex-shrink:0;">${t('done_btn')}</button></div>`;
   });
   html+='</div>';
   el.innerHTML=html;
@@ -1919,7 +1924,7 @@ async function loadColaboradorVoluntarios() {
   let html=`<div class="card" style="padding:0;"><div style="padding:10px 16px 6px;border-bottom:1px solid var(--border);"><div class="card-title" style="margin-bottom:0;">${t('ttl_volunteer_tasks')}</div></div>`;
   rows.forEach(r=>{
     const info=r.last?`${t('lbl_last_time_full')} ${fmtDateShort(r.last.date)} · ${r.last.name||'?'}`:t('never');
-    html+=`<div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:12px;"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${taskDisplayName(r.task)}</div><div style="font-size:11px;color:var(--text3);">${info}</div></div></div>`;
+    html+=`<div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:12px;"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${locName(r.task)}</div><div style="font-size:11px;color:var(--text3);">${info}</div></div></div>`;
   });
   html+='</div>';
   el.innerHTML=html||'<div class="card"><div class="empty">—</div></div>';
@@ -2136,8 +2141,8 @@ async function loadColaboradorDiario() {
     const doneCount=Object.values(doneMap).filter(v=>v).length+Object.values(extraDoneMap).filter(v=>v).length;
     const totalCount=tasks.length+extras.length;
     html+=`<div class="card"><div class="card-title">${firstName} · ${doneCount}/${totalCount} ${t('completed_at')}</div>`;
-    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}${t('unit_m')}</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${task.name}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}${t('unit_min')}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
-    extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const recLabel=task.recurrence==='once'?t('rec_once'):task.recurrence==='daily'?t('rec_daily'):task.recurrence==='weekly'?t('rec_weekly'):t('rec_monfri'); const istHtml=isDone?`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(extraDoneMap[task.id])} ✓</div>`:`<span style="font-size:11px;color:var(--text3);">—</span>`; html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':''}">${task.name} <span class="extra-badge">${recLabel}</span></div><div class="colaborador-task-target">${task.duration_mins?task.duration_mins+t('unit_min'):'—'}${task.note?' · '+task.note:''}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
+    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}${t('unit_m')}</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${locName(task)}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}${t('unit_min')}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
+    extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const recLabel=task.recurrence==='once'?t('rec_once'):task.recurrence==='daily'?t('rec_daily'):task.recurrence==='weekly'?t('rec_weekly'):t('rec_monfri'); const istHtml=isDone?`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(extraDoneMap[task.id])} ✓</div>`:`<span style="font-size:11px;color:var(--text3);">—</span>`; html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':''}">${locName(task)} <span class="extra-badge">${recLabel}</span></div><div class="colaborador-task-target">${task.duration_mins?task.duration_mins+t('unit_min'):'—'}${task.note?' · '+task.note:''}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
     html+='</div>';
   }
   document.getElementById('finca-diario').innerHTML=html||'<div class="card"><div class="empty">—</div></div>';
@@ -2161,7 +2166,7 @@ async function loadColaboradorDiarioOficina() {
     const totalCount=tasks.length;
     html+=`<div class="card"><div class="card-title">${firstName} · ${doneCount}/${totalCount} ${t('completed_at')}</div>`;
     if(tasks.length===0){ html+=`<div class="empty" style="padding:1rem 0;">—</div>`; }
-    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}${t('unit_m')}</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${task.name}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}${t('unit_min')}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
+    tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); const isLate=!isDone&&now>targetEnd; let istHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); istHtml=lateMins>2?`<div class="colaborador-task-actual" style="color:var(--red);">${fmtTime(doneMap[task.id])} +${lateMins}${t('unit_m')}</div>`:`<div class="colaborador-task-actual" style="color:var(--green);">${fmtTime(doneMap[task.id])} ✓</div>`; } else if(isLate){ istHtml=`<span class="badge badge-red">⚠ ${t('pending_badge')}</span>`; } else { istHtml=`<span style="font-size:11px;color:var(--text3);">—</span>`; } html+=`<div class="colaborador-task-item"><div class="colaborador-task-left"><div class="colaborador-task-name" style="${isDone?'color:var(--text3);text-decoration:line-through;':isLate?'color:var(--red);':''}">${locName(task)}</div><div class="colaborador-task-target">${fmtTimeSlot(task.time)} · ${task.dur}${t('unit_min')}</div></div><div class="colaborador-task-right">${istHtml}</div></div>`; });
     html+='</div>';
   }
   el.innerHTML=html||'<div class="card"><div class="empty">—</div></div>';
@@ -2199,19 +2204,19 @@ async function renderColaboradorSemanal() {
     const count=weeklyCountMap[task.id]||0; const done=count>=task.freq;
     const doneBy=weeklyDoneByMap[task.id]||[];
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${locName(task)}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('biweekly_tasks')}</div>`;
   RECURRING.biweekly.forEach(task=>{
     const doneBy=biweeklyDoneByMap2[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${locName(task)}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('monthly_tasks')}</div>`;
   RECURRING.monthly.forEach(task=>{
     const doneBy=monthlyDoneByMap[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${locName(task)}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div>`;
 
@@ -2262,19 +2267,19 @@ async function renderColaboradorSemanalOficina() {
     const count=weeklyCountMap[task.id]||0; const done=count>=task.freq;
     const doneBy=weeklyDoneByMap[task.id]||[];
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${locName(task)}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur>=60?Math.floor(task.dur/60)+t('unit_h')+(task.dur%60?pad(task.dur%60)+t('unit_m'):''):task.dur+t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?`<span class="badge badge-green">✓ ${count}/${task.freq}</span>`:`<span class="badge badge-brown">${count}/${task.freq}</span>`}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('biweekly_tasks')}</div>`;
   RECURRING_OFICINA.biweekly.forEach(task=>{
     const doneBy=biweeklyDoneByMap2[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${locName(task)}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-blue">'+t('biweekly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div><div class="card"><div class="card-title" style="margin-bottom:8px;">${t('monthly_tasks')}</div>`;
   RECURRING_OFICINA.monthly.forEach(task=>{
     const doneBy=monthlyDoneByMap[task.id]||[]; const done=doneBy.length>0;
     const doneByLabel=doneBy.map(d=>'<span style="color:var(--green);">'+d.name+'</span> '+fmtTime(d.time)).join(' · ');
-    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${task.name}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
+    poolHtml+=`<div class="weekly-colaborador-item"><div><div style="font-size:13px;font-weight:500;${done?'color:var(--text3);text-decoration:line-through;':''}">${locName(task)}</div><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">${task.dur}${t('unit_min')}${doneByLabel?' · '+doneByLabel:''}</div></div><div style="text-align:right;">${done?'<span class="badge badge-green">✓</span>':'<span class="badge badge-amber">'+t('monthly_badge')+'</span>'}</div></div>`;
   });
   poolHtml+=`</div>`;
   const toggleHtml=coordList.map((p,i)=>`<button class="wplan-person-btn-of${i===0?' active':''}" data-uid="${p.id}" onclick="switchWplanPersonOficina('${p.id}')">${p.name.split(' ')[0]}</button>`).join('');
@@ -2401,15 +2406,15 @@ async function exportTareas() {
   // daily/weekly/biweekly/monthly completions all carry a tasks.id in task_id, so a single
   // unscoped read of `tasks` covers both finca and oficina scopes.
   const [tk, vp, ex] = await Promise.all([
-    sb.from('tasks').select('id,name'),
-    sb.from('volunteer_pool').select('task_id,name'),
-    sb.from('extra_tasks').select('id,name'),
+    sb.from('tasks').select('*'),
+    sb.from('volunteer_pool').select('*'),
+    sb.from('extra_tasks').select('*'),
   ]);
   const nameById = {};
-  (tk.data||[]).forEach(r => { nameById[r.id] = r.name; });
-  (vp.data||[]).forEach(r => { nameById[r.task_id] = r.name; });
+  (tk.data||[]).forEach(r => { nameById[r.id] = locName(r); });
+  (vp.data||[]).forEach(r => { nameById[r.task_id] = locName(r); });
   // extra_tasks use their row id as task_id in completions
-  (ex.data||[]).forEach(r => { nameById[r.id] = r.name; });
+  (ex.data||[]).forEach(r => { nameById[r.id] = locName(r); });
 
   // Completed tasks in range, joined with person name
   const { data, error } = await sb
@@ -2529,7 +2534,7 @@ async function exportInventario() {
   };
   const headers = [t('exp_h_emoji'),t('exp_h_item'),t('exp_h_category'),t('exp_h_qty'),t('exp_h_unit'),t('exp_h_type'),t('exp_h_alert_urgent'),t('exp_h_alert_week'),t('exp_h_status'),t('exp_h_updated')];
   const rows = items.map(it => [
-    it.emoji || '', it.name, it.category || '', it.quantity,
+    it.emoji || '', locName(it), locName(it,'category') || '', it.quantity,
     it.unit || '', it.unit_type || '',
     it.min_stock ?? '', it.threshold_week ?? '',
     alertLabel(it),
@@ -2568,7 +2573,7 @@ async function exportInventarioHistorial() {
     .sort((a, b) => (meta[a.snapshot_id].date + (a.sort_order||0)).localeCompare(meta[b.snapshot_id].date + (b.sort_order||0)))
     .map(l => {
       const m = meta[l.snapshot_id];
-      return [ m.date, m.time, m.by, l.emoji || '', l.item_name, l.category || '',
+      return [ m.date, m.time, m.by, l.emoji || '', locName(l,'item_name'), locName(l,'category') || '',
                l.quantity, l.unit || '', l.unit_type || '', m.note ];
     });
   downloadCSV(`${t('exp_file_inv_hist')}-${from}_${to}.csv`, headers, rows);
@@ -2778,9 +2783,9 @@ function getTodayDow() { const d=new Date().getDay(); return d===0?7:d; }
 function getAllNonDailyTasks(scope) {
   const src = scope==='oficina' ? RECURRING_OFICINA : RECURRING;
   const tasks=[];
-  src.weekly.forEach(t=>tasks.push({id:t.id,name:t.name,dur:t.dur,type:'weekly'}));
-  src.biweekly.forEach(t=>tasks.push({id:t.id,name:t.name,dur:t.dur,type:'biweekly'}));
-  src.monthly.forEach(t=>tasks.push({id:t.id,name:t.name,dur:t.dur,type:'monthly'}));
+  src.weekly.forEach(t=>tasks.push({id:t.id,name:t.name,name_en:t.name_en,dur:t.dur,type:'weekly'}));
+  src.biweekly.forEach(t=>tasks.push({id:t.id,name:t.name,name_en:t.name_en,dur:t.dur,type:'biweekly'}));
+  src.monthly.forEach(t=>tasks.push({id:t.id,name:t.name,name_en:t.name_en,dur:t.dur,type:'monthly'}));
   return tasks;
 }
 
@@ -2851,7 +2856,7 @@ async function renderWplanDay(containerId, userId, isColaborador, dow, weekStart
       } else if(isColaborador){
         rightHtml=`<button onclick="deleteWplanTask('${task.id}','${containerId}','${userId}',${isColaborador},'${weekStart}')" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--red-light);color:var(--red);cursor:pointer;flex-shrink:0;">✕</button>`;
       }
-      html+=`<div class="wplan-item"><div style="flex:1;min-width:0;"><div class="wplan-item-name ${isDone?'done':''}">${task.task_name}</div><div class="wplan-item-meta">${task.start_time||'—'} · ${task.duration_mins?task.duration_mins+t('unit_min'):'—'}${task.note?' · '+task.note:''}</div></div>${rightHtml}</div>`;
+      html+=`<div class="wplan-item"><div style="flex:1;min-width:0;"><div class="wplan-item-name ${isDone?'done':''}">${locName(task,'task_name')}</div><div class="wplan-item-meta">${task.start_time||'—'} · ${task.duration_mins?task.duration_mins+t('unit_min'):'—'}${task.note?' · '+task.note:''}</div></div>${rightHtml}</div>`;
     });
   }
   html+=`</div>`;
@@ -2891,8 +2896,8 @@ function openWplanModal(userId, dow, weekStart, containerId) {
   sel.innerHTML='';
   getAllNonDailyTasks(scope).forEach(task=>{
     const opt=document.createElement('option');
-    opt.value=task.id; opt.textContent=task.name+(task.dur?` · ${task.dur}${t('unit_min')}`:'');
-    opt.dataset.name=task.name; opt.dataset.dur=task.dur||'';
+    opt.value=task.id; opt.textContent=locName(task)+(task.dur?` · ${task.dur}${t('unit_min')}`:'');
+    opt.dataset.name=task.name; opt.dataset.nameEn=task.name_en||''; opt.dataset.dur=task.dur||'';
     sel.appendChild(opt);
   });
   document.getElementById('wplan-time-wrap').innerHTML = timePickerHTML('wplan-time', '07:00');
@@ -2920,11 +2925,12 @@ function selectWplanType(btn) {
 async function saveWplanTask() {
   const {userId,dow,weekStart,containerId}=wplanModalState;
   const isExisting=document.querySelector('#wplan-modal .rec-opt.selected')?.dataset.val==='existing';
-  let taskName=''; let taskId=null; let dur=parseInt(document.getElementById('wplan-dur').value)||null;
+  let taskName=''; let taskNameEn=null; let taskId=null; let dur=parseInt(document.getElementById('wplan-dur').value)||null;
   if(isExisting){
     const sel=document.getElementById('wplan-task-select');
     const opt=sel.options[sel.selectedIndex];
     taskName=opt?.dataset.name||opt?.textContent||'';
+    taskNameEn=opt?.dataset.nameEn||null;
     taskId=sel.value;
     if(!dur&&opt?.dataset.dur) dur=parseInt(opt.dataset.dur)||null;
   } else {
@@ -2933,7 +2939,7 @@ async function saveWplanTask() {
   const startTime=getTimeValue('wplan-time');
   const note=document.getElementById('wplan-note').value.trim();
   if(!taskName){showToast(t('err_name'));return;}
-  const {error}=await sb.from('week_plan').insert({user_id:userId,task_name:taskName,task_id:taskId,day_of_week:dow,week_start:weekStart,start_time:startTime,duration_mins:dur,note:note||null,confirmed:false,created_by:currentUser.id});
+  const {error}=await sb.from('week_plan').insert({user_id:userId,task_name:taskName,task_name_en:taskNameEn,task_id:taskId,day_of_week:dow,week_start:weekStart,start_time:startTime,duration_mins:dur,note:note||null,confirmed:false,created_by:currentUser.id});
   if(error){showToast(t('err_save'));console.error(error);return;}
   showToast(t('wplan_saved')); closeWplanModal();
   const {data:planRows}=await sb.from('week_plan').select('*').eq('user_id',userId).eq('week_start',weekStart);
@@ -3074,21 +3080,21 @@ async function renderInventario() {
     html += `<div class="card"><div class="empty">${t('inv_empty')}</div></div>`;
   } else {
     const cats = {};
-    items.forEach(it => { (cats[it.category||t('inv_cat_other')] = cats[it.category||t('inv_cat_other')]||[]).push(it); });
+    items.forEach(it => { (cats[locName(it,'category')||t('inv_cat_other')] = cats[locName(it,'category')||t('inv_cat_other')]||[]).push(it); });
     Object.keys(cats).forEach(cat => {
       html += `<div class="card" style="padding:0;"><div style="padding:10px 16px 6px;border-bottom:1px solid var(--border);"><div class="card-title" style="margin-bottom:0;">${cat}</div></div>`;
       cats[cat].forEach(it => {
         const alert = inventoryAlert(it); // '', 'urgent', 'week'
         const badge = alert==='urgent' ? ` <span class="badge badge-red" style="font-size:9px;">${t('inv_badge_urgent')}</span>`
                     : alert==='week'   ? ` <span class="badge" style="font-size:9px;background:#f3d27a;color:#5a4400;">${t('inv_badge_week')}</span>` : '';
-        const unitLabel = it.unit ? ' '+it.unit : '';
+        const unitLabel = locName(it,'unit') ? ' '+locName(it,'unit') : '';
         html += `<div id="iv-row-${it.id}" style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);gap:8px;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:500;">${it.emoji?it.emoji+' ':''}${it.name}<span id="iv-badge-${it.id}">${badge}</span></div>
+            <div style="font-size:14px;font-weight:500;">${it.emoji?it.emoji+' ':''}${locName(it)}<span id="iv-badge-${it.id}">${badge}</span></div>
             <div style="font-size:11px;color:var(--text3);">${it.unit_type==='free'?t('inv_unit_free_low'):it.unit_type}${it.min_stock!=null?' · '+t('inv_meta_urgent')+it.min_stock:''}${it.threshold_week!=null?' · '+t('inv_meta_week')+it.threshold_week:''}</div>
           </div>
           <input type="number" inputmode="decimal" value="${Number(it.quantity)}" onchange="setInventoryQty('${it.id}', this.value)" style="width:64px;text-align:center;font-family:'DM Mono',monospace;font-size:14px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg);flex-shrink:0;">
-          <div style="font-size:12px;color:var(--text3);min-width:38px;">${it.unit||''}</div>
+          <div style="font-size:12px;color:var(--text3);min-width:38px;">${locName(it,'unit')||''}</div>
           <button onclick="deleteInventory('${it.id}')" title="${t('btn_delete_title')}" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--text3);flex-shrink:0;">🗑</button>
         </div>`;
       });
@@ -3136,8 +3142,10 @@ async function takeSnapshot() {
   if(e1 || !snap || snap.length===0){ showToast(t('err_rls')); return; }
   const snapId = snap[0].id;
   const lines = items.map(it => ({
-    snapshot_id: snapId, item_name: it.name, emoji: it.emoji, category: it.category,
-    quantity: it.quantity, unit: it.unit, unit_type: it.unit_type, sort_order: it.sort_order
+    snapshot_id: snapId, item_name: it.name, item_name_en: it.name_en,
+    emoji: it.emoji, category: it.category, category_en: it.category_en,
+    quantity: it.quantity, unit: it.unit, unit_en: it.unit_en,
+    unit_type: it.unit_type, sort_order: it.sort_order
   }));
   const {data: ld, error: e2} = await sb.from('inventory_snapshot_lines').insert(lines).select();
   if(e2 || !ld || ld.length===0){ showToast(t('inv_err_lines')); return; }
@@ -3155,20 +3163,20 @@ async function genInventoryWhatsApp() {
   let txt = `${t('wa_header')}\n${t('wa_date')}: ${fecha}\n${t('wa_time')}: ${hora}\n${t('wa_by')}: ${currentProfile.name||'—'}\n${bar}\n${t('wa_current')}\n${bar}\n`;
   // group by category
   const cats = {};
-  items.forEach(it => { (cats[it.category||t('inv_cat_other')] = cats[it.category||t('inv_cat_other')]||[]).push(it); });
+  items.forEach(it => { (cats[locName(it,'category')||t('inv_cat_other')] = cats[locName(it,'category')||t('inv_cat_other')]||[]).push(it); });
   Object.keys(cats).forEach(cat => {
     txt += `\n${cat}\n`;
     cats[cat].forEach(it => {
-      const val = it.unit_type==='pct' ? Number(it.quantity)+'%' : Number(it.quantity)+(it.unit?' '+it.unit:'');
-      txt += `• ${it.emoji?it.emoji+' ':''}${it.name}: ${val}\n`;
+      const val = it.unit_type==='pct' ? Number(it.quantity)+'%' : Number(it.quantity)+(locName(it,'unit')?' '+locName(it,'unit'):'');
+      txt += `• ${it.emoji?it.emoji+' ':''}${locName(it)}: ${val}\n`;
     });
   });
   // alerts
   const urgent = items.filter(it => inventoryAlert(it)==='urgent');
   const week   = items.filter(it => inventoryAlert(it)==='week');
   txt += `${bar}\n${t('wa_alerts')}\n${bar}\n`;
-  if(urgent.length){ txt += `${t('wa_buy_urgent')}\n`; urgent.forEach((it,i)=> txt += `${i+1}. ${it.name}\n`); }
-  if(week.length){ txt += `${t('wa_buy_week')}\n`; week.forEach((it,i)=> txt += `${i+1}. ${it.name}\n`); }
+  if(urgent.length){ txt += `${t('wa_buy_urgent')}\n`; urgent.forEach((it,i)=> txt += `${i+1}. ${locName(it)}\n`); }
+  if(week.length){ txt += `${t('wa_buy_week')}\n`; week.forEach((it,i)=> txt += `${i+1}. ${locName(it)}\n`); }
   if(!urgent.length && !week.length) txt += `${t('wa_no_alerts')}\n`;
   // copy to clipboard
   try { await navigator.clipboard.writeText(txt); showToast(t('inv_msg_copied')); }
@@ -3206,13 +3214,13 @@ async function viewSnapshot(id) {
   const {data: lines} = await sb.from('inventory_snapshot_lines').select('*').eq('snapshot_id', id).order('sort_order');
   if(!lines || lines.length===0){ document.getElementById('history-modal-content').innerHTML=`<div class="empty">${t('empty_void')}</div>`; return; }
   const cats = {};
-  lines.forEach(l => { (cats[l.category||t('inv_cat_other')] = cats[l.category||t('inv_cat_other')]||[]).push(l); });
+  lines.forEach(l => { (cats[locName(l,'category')||t('inv_cat_other')] = cats[locName(l,'category')||t('inv_cat_other')]||[]).push(l); });
   let html = `<button onclick="renderInventoryHistory()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;margin-bottom:8px;">${t('btn_back')}</button>`;
   Object.keys(cats).forEach(cat => {
     html += `<div style="font-size:12px;font-weight:700;color:var(--text2);margin:10px 0 4px;">${cat}</div>`;
     cats[cat].forEach(l => {
-      const val = l.unit_type==='pct' ? Number(l.quantity)+'%' : Number(l.quantity)+(l.unit?' '+l.unit:'');
-      html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border);"><span>${l.emoji?l.emoji+' ':''}${l.item_name}</span><span style="font-family:monospace;">${val}</span></div>`;
+      const val = l.unit_type==='pct' ? Number(l.quantity)+'%' : Number(l.quantity)+(locName(l,'unit')?' '+locName(l,'unit'):'');
+      html += `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border);"><span>${l.emoji?l.emoji+' ':''}${locName(l,'item_name')}</span><span style="font-family:monospace;">${val}</span></div>`;
     });
   });
   document.getElementById('history-modal-content').innerHTML = html;

@@ -89,6 +89,10 @@ To re-anchor everything to today, run [`supabase/reset.sql`](supabase/reset.sql)
 by [`supabase/seed.sql`](supabase/seed.sql) in the Supabase SQL editor. The auth users are
 left untouched — only the data is regenerated.
 
+A database created before the bilingual content columns existed needs
+[`supabase/migrate-content-i18n.sql`](supabase/migrate-content-i18n.sql) once. Fresh
+installs do not: `schema.sql` declares the columns and `seed.sql` fills them.
+
 ## Differences from the production build
 
 The clock-in is normally restricted by a 200 m geofence around the centre. This demo sets
