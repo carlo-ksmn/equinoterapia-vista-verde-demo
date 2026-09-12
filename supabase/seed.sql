@@ -182,7 +182,9 @@ from public.clients where name = 'Renata Guzmán';
 -- No horse is booked more than three times a day, which is what the "check the
 -- board" warning in the agenda watches for.
 insert into public.therapy_schedule (client_id, day_of_week, time_slot, is_active)
-select c.id, v.dow, v.slot, true
+-- v.slot needs the explicit cast: inside a VALUES list the literal is typed as
+-- text, and text -> time is not an implicit cast.
+select c.id, v.dow, v.slot::time, true
 from (values
   -- Monday
   ('Mateo Rivas',    1, '09:00'),
