@@ -940,6 +940,8 @@ function recurringRightHTML(taskId, cadence, onToday, isDone, dimDone) {
 
 // DAILY PLAN (only daily tasks — no weekly/biweekly/monthly)
 async function renderDailyPlan() {
+  const el=document.getElementById('plan-card');
+  if(!el) return;
   const tasks=DAILY_BY_USER[currentUser.id]||[]; const today=todayStr();
   const {data:completions}=await sb.from('task_completions').select('*').eq('user_id',currentUser.id).eq('date',today).eq('task_type','daily');
   const doneMap={}; (completions||[]).forEach(c=>{doneMap[c.task_id]=c.completed_at;});
@@ -949,7 +951,7 @@ async function renderDailyPlan() {
   let html=`<div class="card-title">${t('daily_plan')}</div>`; const now=new Date();
   tasks.forEach(task=>{ const isDone=!!doneMap[task.id]; const taskName=locName(task); const [sh,sm]=task.time.split(':').map(Number); const targetEnd=new Date(); targetEnd.setHours(sh,sm,0,0); targetEnd.setMinutes(targetEnd.getMinutes()+task.dur); let statusHtml=''; if(isDone){ const doneDate=new Date(doneMap[task.id]); const lateMins=Math.round((doneDate-targetEnd)/60000); statusHtml=lateMins>2?'<div class="task-late">+'+lateMins+t('unit_min')+' '+t('late_by')+'</div>':'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(doneMap[task.id])+'</div>'; } else if(now>targetEnd){ statusHtml='<div class="task-late">⚠ '+t('late_by')+'</div>'; } const ck=isDone?'':'completeTask(\''+task.id+'\',\'daily\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+taskName+'</div><div class="task-target">'+fmtTimeSlot(task.time)+' · '+task.dur+t('unit_min')+'</div>'+statusHtml+'</div></div>'; });
   extras.forEach(task=>{ const isDone=!!extraDoneMap[task.id]; const ck2=isDone?'':'completeTask(\''+task.id+'\',\'extra\')'; html+='<div class="task-item"><div class="task-check '+(isDone?'done':'')+('" onclick="')+ck2+'">'+(isDone?'✓':'')+'</div><div class="task-body"><div class="task-name '+(isDone?'done':'')+'">'+locName(task)+'<span class="extra-badge">'+t('rec_once')+'</span></div><div class="task-target">'+(task.duration_mins?task.duration_mins+t('unit_min'):'—')+(task.note?' · '+task.note:'')+'</div>'+(isDone?'<div class="task-stamp">'+t('completed_at')+' '+fmtTime(extraDoneMap[task.id])+'</div>':'')+'</div></div>'; });
-  document.getElementById('plan-card').innerHTML=html;
+  el.innerHTML=html;
 }
 
 // Coordinador oficina daily plan — mirrors renderDailyPlan but reads oficina scope.
@@ -970,18 +972,31 @@ async function completeTask(taskId,taskType) {
   const today=todayStr(); const now=new Date().toISOString();
   await sb.from('task_completions').upsert({user_id:currentUser.id,task_id:taskId,date:today,task_type:taskType,completed_at:now},{onConflict:'user_id,task_id,date'});
   showToast(t('task_done'));
-  if(taskType==='daily'||taskType==='extra') await renderDailyPlan();
-  else if(taskType==='weekly') await renderWeeklyTasks();
-  else if(taskType==='biweekly') await renderBiweeklyTasks();
-  else if(taskType==='monthly') await renderMonthlyTasks();
-  else if(taskType==='vol_pool') await renderVolunteerTareas();
+  // Re-render the view the click came from. The oficina scope keeps its daily
+  // tasks in a card of its own, so a coordinador needs that one rather than the
+  // pesticero card. Weekly, biweekly and monthly rows are only ever offered in
+  // the pesticero Semanal tab (see recurringRightHTML), and the pool only in the
+  // volunteer view.
+  if(taskType==='vol_pool') return renderVolunteerTareas();
+  if(taskType==='daily'||taskType==='extra') {
+    return currentProfile?.role==='coordinador' ? renderOficinaDailyPlan() : renderDailyPlan();
+  }
+  return renderPesticeroSemanal();
 }
 
 async function completeTaskOnDate(taskId,taskType,date) {
   const now=new Date().toISOString();
   await sb.from('task_completions').upsert({user_id:currentUser.id,task_id:taskId,date:date,task_type:taskType,completed_at:now},{onConflict:'user_id,task_id,date'});
   showToast(t('task_done'));
-  await renderPesticeroSemanal();
+  // In the pesticero Semanal tab the week plan sits next to the recurring pools
+  // and a completion shows in both, so rebuild the whole tab. A coordinador sees
+  // the week plan on its own — refresh the day that is open.
+  if(currentProfile?.role==='pesticero') return renderPesticeroSemanal();
+  if(!wplanState.containerId) return;
+  const {data:planRows}=await sb.from('week_plan').select('*')
+    .eq('user_id',wplanState.userId).eq('week_start',wplanState.weekStart);
+  return renderWplanDay(wplanState.containerId, wplanState.userId,
+    wplanState.isColaborador, wplanState.dow, wplanState.weekStart, planRows||[]);
 }
 
 // SEMANAL TAB (Pesticero) — Weekly plan + weekly/biweekly/monthly with day selector
@@ -2768,7 +2783,7 @@ async function loadExtraTasks(userId,date) {
 }
 
 // WEEK PLAN
-let wplanState = { userId: null, dow: null, weekStart: null, isColaborador: false };
+let wplanState = { userId: null, dow: null, weekStart: null, isColaborador: false, containerId: null };
 
 function getWplanWeekStart() {
   const d=new Date(); const day=d.getDay();
@@ -2805,7 +2820,7 @@ async function renderWeekPlanView(containerId, userId, isColaborador, scope) {
   if(!el) return;
   const weekStart=getWplanWeekStart();
   const todayDow=getTodayDow();
-  wplanState={userId, weekStart, isColaborador, dow:todayDow, scope:scope||'finca'};
+  wplanState={userId, weekStart, isColaborador, dow:todayDow, scope:scope||'finca', containerId};
   const {data:planRows}=await sb.from('week_plan').select('*').eq('user_id',userId).eq('week_start',weekStart);
   const confirmed=(planRows||[]).some(r=>r.confirmed);
   let html='';

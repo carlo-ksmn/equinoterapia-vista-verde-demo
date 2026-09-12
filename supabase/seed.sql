@@ -340,16 +340,14 @@ insert into public.task_completions (user_id, task_id, task_type, date, complete
 select t.assignee_id, t.id, 'weekly', (current_date - 7), (current_date - 7) + time '16:45'
 from public.tasks t where t.id = 'weekly-tack-check';
 
--- Today, on a weekday: tick off whatever was already due when the seed ran, so the
--- daily plan opens on a believable half-finished day rather than a wall of overdue
--- rows. Nothing is stamped in the future, whatever time of day this runs.
-insert into public.task_completions (user_id, task_id, task_type, date, completed_at)
-select t.assignee_id, t.id, 'daily', current_date,
-       current_date + t.default_time + interval '4 minutes'
-from public.tasks t
-where t.cadence = 'daily'
-  and extract(isodow from current_date) <= 5
-  and t.default_time + interval '4 minutes' < current_time;
+-- No completions are seeded for TODAY on purpose. completed_at is timestamptz, but
+-- default_time is a wall-clock time, so `current_date + default_time` is read as UTC
+-- and the app renders the instant in the viewer's own timezone. Today's plan is the
+-- one view that compares the two (lateMins = completed_at - targetEnd, with targetEnd
+-- built from local time), so a seeded stamp shows up shifted by the viewer's UTC
+-- offset and earns a red "late" badge it has not earned. Leaving today open is
+-- honest in every timezone; the rows below are historical and are never rendered
+-- against a planned time.
 
 -- weekly-deep-clean needs two completions a week, so leave it at 1/2 in progress.
 insert into public.task_completions (user_id, task_id, task_type, date, completed_at)
