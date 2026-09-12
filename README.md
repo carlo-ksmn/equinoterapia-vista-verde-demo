@@ -86,8 +86,19 @@ weeks the agenda shows no upcoming sessions and the overtime balance for the cur
 period reads zero.
 
 To re-anchor everything to today, run [`supabase/reset.sql`](supabase/reset.sql) followed
-by [`supabase/seed.sql`](supabase/seed.sql) in the Supabase SQL editor. The auth users are
-left untouched — only the data is regenerated.
+by [`supabase/seed.sql`](supabase/seed.sql) in the Supabase SQL editor. `reset.sql` clears
+the demo data and keeps `public.profiles`, so the five accounts and their roles survive.
+
+Do not reach for [`supabase/reset-full.sql`](supabase/reset-full.sql) for this. It also
+truncates `public.profiles`, and nothing recreates those rows: they come from an auth
+trigger that only fires on sign-up, and `seed.sql` only UPDATEs them. It is the script for
+one specific situation — you deleted the auth users, so their old profiles rows are
+orphaned — and it requires recreating the users before seeding. `seed.sql` refuses to run
+when the profiles are missing rather than leaving you with a demo that loads but has no
+names, roles or working login.
+
+`seed.sql` is not idempotent and also refuses to run when the demo tables still hold data,
+so always let `reset.sql` go first.
 
 A database created before the bilingual content columns existed needs
 [`supabase/migrate-content-i18n.sql`](supabase/migrate-content-i18n.sql) once. Fresh
