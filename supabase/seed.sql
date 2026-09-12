@@ -294,7 +294,7 @@ insert into public.inventory_items (name, name_en, category, category_en, quanti
   ('Heno',               'Hay',                     'Alimentación', 'Feed',      40, 'pacas',    'bales', 10, 12, '🌾', 'count', 1),
   ('Concentrado equino', 'Equine concentrate feed', 'Alimentación', 'Feed',      18, 'sacos',    'sacks',  6,  8, '🥣', 'count', 2),
   ('Silo de alimento',   'Feed silo',               'Alimentación', 'Feed',      65, '%',        '%',    null, null, '🛢', 'pct',   3),
-  ('Cascos de repuesto', 'Spare helmets',           'Equipo',       'Equipment',  6, 'unidades', 'units',  2, null, '🐴', 'count', 4),
+  ('Cascos de repuesto', 'Spare horseshoes',        'Equipo',       'Equipment',  6, 'unidades', 'units',  2, null, '🐴', 'count', 4),
   ('Guantes de trabajo', 'Work gloves',             'Equipo',       'Equipment', 15, 'pares',    'pairs',  5, null, '🧤', 'count', 5),
   ('Cepillos de aseo',   'Grooming brushes',        'Equipo',       'Equipment', 10, 'unidades', 'units',  3, null, '🧹', 'count', 6),
   ('Botiquín',           'First-aid kit',           'Salud',        'Health',     1, 'kit',      'kit',    1, null, '🩹', 'free',  7);

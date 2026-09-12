@@ -59,7 +59,7 @@ from (values
   ('Heno',               'Hay',                     'Feed',      'bales'),
   ('Concentrado equino', 'Equine concentrate feed', 'Feed',      'sacks'),
   ('Silo de alimento',   'Feed silo',               'Feed',      '%'),
-  ('Cascos de repuesto', 'Spare helmets',           'Equipment', 'units'),
+  ('Cascos de repuesto', 'Spare horseshoes',        'Equipment', 'units'),
   ('Guantes de trabajo', 'Work gloves',             'Equipment', 'pairs'),
   ('Cepillos de aseo',   'Grooming brushes',        'Equipment', 'units'),
   ('Botiquín',           'First-aid kit',           'Health',    'kit')
