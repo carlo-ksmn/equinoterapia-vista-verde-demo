@@ -1,15 +1,21 @@
--- Equinoterapia Vista Verde — wipe all demo data.
+-- Equinoterapia Vista Verde — wipe the demo DATA and keep the accounts.
 --
--- Use this to rebuild the demo from scratch, e.g. after recreating the auth users
--- (deleting a user in Supabase does NOT delete its public.profiles row, and every
--- seeded record references profiles by UUID — so recreating users without this
--- reset leaves the data attached to orphaned profiles).
+-- This is the script for the routine refresh described in the README: the seed
+-- anchors every date to the moment it runs, so re-running reset.sql + seed.sql
+-- re-centres the agenda, the weekly plan and the pay period on today.
 --
--- Order of operations:
---   1. Delete the auth users (Authentication > Users)
---   2. Run this script
---   3. Create the auth users listed at the top of seed.sql
---   4. Run seed.sql
+-- public.profiles is deliberately NOT truncated. Nothing recreates those rows:
+-- they are created by an auth trigger when a user signs up, and seed.sql only
+-- UPDATEs them (names, roles, targets). Truncating profiles without recreating
+-- the auth users would leave the table empty, seed.sql would quietly update
+-- zero rows, and the app would have no names, no roles and no working login.
+--
+-- Usage:
+--   1. Run this script
+--   2. Run seed.sql
+--
+-- If you deleted and recreated the auth users, the old profiles rows are now
+-- orphaned and you need reset-full.sql instead.
 --
 -- This touches the public schema only; the auth schema is left alone.
 
@@ -33,6 +39,5 @@ truncate table
   public.expenses,
   public.inventory_snapshot_lines,
   public.inventory_snapshots,
-  public.inventory_items,
-  public.profiles
+  public.inventory_items
 cascade;

@@ -21,7 +21,34 @@ each login shows a genuinely different application. Password for all accounts:
 | `colaborador` | `ana.admin@vistaverde-demo.com` | Full management view: team, agenda, payroll, admin |
 | `coordinador` | `carmen.coord@vistaverde-demo.com` | Office view: therapy agenda, office tasks, finances |
 | `pesticero` | `luis.pesticero@vistaverde-demo.com` | Daily farm view: own task list, clock-in, overtime balance |
-| `volunteer` | `carlos.voluntario@vistaverde-demo.com` | Volunteer view: task pool, own hours, ES/EN toggle |
+| `volunteer` | `carlos.voluntario@vistaverde-demo.com` | Volunteer view: task pool, own hours |
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-stablehand-daily-en.png" width="180" alt="Stablehand daily view: clock, clock-in button and today's task plan"><br><sub><b>Stablehand</b> · Daily plan</sub></td>
+    <td align="center"><img src="docs/screenshots/04-coordinator-office-daily-en.png" width="180" alt="Coordinator office view: clock-in, hours balance and today's office tasks"><br><sub><b>Coordinator</b> · Office day</sub></td>
+    <td align="center"><img src="docs/screenshots/07-manager-team-en.png" width="180" alt="Manager team view: each person's hours and status today, plus a weekly summary"><br><sub><b>Manager</b> · Team hours</sub></td>
+    <td align="center"><img src="docs/screenshots/09-volunteer-tasks-en.png" width="180" alt="Volunteer task pool: shared tasks with their last completion and a Done button"><br><sub><b>Volunteer</b> · Task pool</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/03-stablehand-weekly-en.png" width="180" alt="Stablehand weekly view: day picker, the day's plan and the weekly and fortnightly task pools"><br><sub><b>Stablehand</b> · Weekly plan</sub></td>
+    <td align="center"><img src="docs/screenshots/05-coordinator-schedule-en.png" width="180" alt="Coordinator therapy agenda for one day, with day picker and a button to add a session"><br><sub><b>Coordinator</b> · Therapy agenda</sub></td>
+    <td align="center"><img src="docs/screenshots/08-manager-inventory-en.png" width="180" alt="Manager inventory: stock per item with urgent and this-week alerts"><br><sub><b>Manager</b> · Inventory alerts</sub></td>
+    <td align="center"><img src="docs/screenshots/06-manager-volunteers-en.png" width="180" alt="Manager operations view: volunteer tasks with when and by whom each was last done"><br><sub><b>Manager</b> · Volunteer tasks</sub></td>
+  </tr>
+</table>
+
+Every role can switch the whole interface between English and Spanish, task and inventory
+names included:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-stablehand-daily-en.png" width="180" alt="Stablehand daily view in English"> <img src="docs/screenshots/02-stablehand-daily-es.png" width="180" alt="The same stablehand daily view in Spanish"><br><sub><b>Stablehand</b> · English / Español</sub></td>
+    <td align="center"><img src="docs/screenshots/09-volunteer-tasks-en.png" width="180" alt="Volunteer task pool in English"> <img src="docs/screenshots/10-volunteer-tasks-es.png" width="180" alt="The same volunteer task pool in Spanish"><br><sub><b>Volunteer</b> · English / Español</sub></td>
+  </tr>
+</table>
 
 ## Features
 
@@ -34,7 +61,11 @@ each login shows a genuinely different application. Password for all accounts:
 - **Client records** — public roster separated from private data (diagnosis, tutor,
   contact details) at the database level, enforced by row-level security
 - **Inventory** — stock levels with thresholds and point-in-time snapshots
-- **Bilingual UI** — Spanish throughout, with an English toggle for volunteers
+- **Bilingual UI** — every role can switch the whole interface between Spanish and
+  English; the choice is stored per user in `profiles.language`. Dates and numbers follow
+  the selected language. Task, volunteer-pool and inventory names carry their own English
+  columns and switch along; anything typed into the app itself (notes, client records, a
+  newly added extra task or stock item) stays as entered
 
 ## Tech stack
 
@@ -83,8 +114,23 @@ weeks the agenda shows no upcoming sessions and the overtime balance for the cur
 period reads zero.
 
 To re-anchor everything to today, run [`supabase/reset.sql`](supabase/reset.sql) followed
-by [`supabase/seed.sql`](supabase/seed.sql) in the Supabase SQL editor. The auth users are
-left untouched — only the data is regenerated.
+by [`supabase/seed.sql`](supabase/seed.sql) in the Supabase SQL editor. `reset.sql` clears
+the demo data and keeps `public.profiles`, so the five accounts and their roles survive.
+
+Do not reach for [`supabase/reset-full.sql`](supabase/reset-full.sql) for this. It also
+truncates `public.profiles`, and nothing recreates those rows: they come from an auth
+trigger that only fires on sign-up, and `seed.sql` only UPDATEs them. It is the script for
+one specific situation — you deleted the auth users, so their old profiles rows are
+orphaned — and it requires recreating the users before seeding. `seed.sql` refuses to run
+when the profiles are missing rather than leaving you with a demo that loads but has no
+names, roles or working login.
+
+`seed.sql` is not idempotent and also refuses to run when the demo tables still hold data,
+so always let `reset.sql` go first.
+
+A database created before the bilingual content columns existed needs
+[`supabase/migrate-content-i18n.sql`](supabase/migrate-content-i18n.sql) once. Fresh
+installs do not: `schema.sql` declares the columns and `seed.sql` fills them.
 
 ## Differences from the production build
 

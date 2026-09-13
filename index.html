@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Equinoterapia Vista Verde · Gestión</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -17,20 +17,20 @@
     <img src="/logo.svg" alt="Equinoterapia Vista Verde" style="width:120px;height:auto;margin-bottom:0.5rem;">
   </div>
   <div>
-    <div class="auth-title">Equinoterapia Vista Verde · Gestión</div>
-    <div class="auth-sub" style="margin-top:6px;">Demo pública · datos ficticios</div>
+    <div class="auth-title" data-i18n="app_title">Equinoterapia Vista Verde · Gestión</div>
+    <div class="auth-sub" style="margin-top:6px;" data-i18n="auth_demo_note">Demo pública · datos ficticios</div>
   </div>
   <div class="auth-card">
     <div>
-      <div class="field-label">Correo electrónico</div>
-      <input type="email" id="auth-email" placeholder="tu@correo.com" autocomplete="email">
+      <div class="field-label" data-i18n="lbl_email">Correo electrónico</div>
+      <input type="email" id="auth-email" placeholder="tu@correo.com" data-i18n-ph="ph_email" autocomplete="email">
     </div>
     <div>
-      <div class="field-label">Contraseña</div>
+      <div class="field-label" data-i18n="lbl_password">Contraseña</div>
       <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password">
     </div>
     <div class="auth-error" id="auth-error"></div>
-    <button class="btn-primary" onclick="login()" id="login-btn">Entrar</button>
+    <button class="btn-primary" onclick="login()" id="login-btn" data-i18n="btn_login">Entrar</button>
   </div>
 </div>
 
@@ -45,7 +45,7 @@
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
-      <button class="logout-btn" onclick="logout()" title="Salir">⏏</button>
+      <button class="logout-btn" onclick="logout()" title="Salir" data-i18n-title="btn_logout_title">⏏</button>
     </div>
   </div>
   <div class="content" id="main-content"></div>
@@ -57,39 +57,39 @@
 <div class="modal-overlay" id="extra-modal" style="display:none;" onclick="if(event.target===this)closeExtraModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;">
-      <div class="modal-title">Nueva tarea extra</div>
+      <div class="modal-title" data-i18n="ttl_extra_task">Nueva tarea extra</div>
       <button class="modal-close" onclick="closeExtraModal()">✕</button>
     </div>
     <div class="form-row">
-      <div class="field-label">Nombre de la tarea</div>
-      <input class="form-input" id="et-name" placeholder="Ej: Limpiar almacén" type="text">
+      <div class="field-label" data-i18n="lbl_task_name">Nombre de la tarea</div>
+      <input class="form-input" id="et-name" placeholder="Ej: Limpiar almacén" data-i18n-ph="ph_task_name" type="text">
     </div>
     <div class="form-row">
-      <div class="field-label">Asignar a</div>
+      <div class="field-label" data-i18n="lbl_assign_to">Asignar a</div>
       <div class="person-toggle-row" id="et-persons"></div>
     </div>
     <div class="form-row">
-      <div class="field-label">Fecha</div>
+      <div class="field-label" data-i18n="lbl_date">Fecha</div>
       <input class="form-input" id="et-date" type="date">
     </div>
     <div class="form-row">
-      <div class="field-label">Duración estimada (minutos)</div>
-      <input class="form-input" id="et-dur" placeholder="Ej: 45" type="number" min="5" max="480">
+      <div class="field-label" data-i18n="lbl_dur_est">Duración estimada (minutos)</div>
+      <input class="form-input" id="et-dur" placeholder="Ej: 45" data-i18n-ph="ph_dur_45" type="number" min="5" max="480">
     </div>
     <div class="form-row">
-      <div class="field-label">Nota (opcional)</div>
-      <input class="form-input" id="et-note" placeholder="Instrucciones adicionales…" type="text">
+      <div class="field-label" data-i18n="lbl_note_opt">Nota (opcional)</div>
+      <input class="form-input" id="et-note" placeholder="Instrucciones adicionales…" data-i18n-ph="ph_note_extra" type="text">
     </div>
     <div class="form-row">
-      <div class="field-label">Repetición</div>
+      <div class="field-label" data-i18n="lbl_recurrence">Repetición</div>
       <div class="recurrence-row">
-        <button class="rec-opt selected" data-val="once" onclick="selectRec(this)">Solo esta vez</button>
-        <button class="rec-opt" data-val="daily" onclick="selectRec(this)">Cada día</button>
-        <button class="rec-opt" data-val="weekly" onclick="selectRec(this)">Cada semana</button>
-        <button class="rec-opt" data-val="mon-fri" onclick="selectRec(this)">Lun–Vie</button>
+        <button class="rec-opt selected" data-val="once" onclick="selectRec(this)" data-i18n="btn_rec_once">Solo esta vez</button>
+        <button class="rec-opt" data-val="daily" onclick="selectRec(this)" data-i18n="btn_rec_daily">Cada día</button>
+        <button class="rec-opt" data-val="weekly" onclick="selectRec(this)" data-i18n="btn_rec_weekly">Cada semana</button>
+        <button class="rec-opt" data-val="mon-fri" onclick="selectRec(this)" data-i18n="btn_rec_monfri">Lun–Vie</button>
       </div>
     </div>
-    <button class="btn-primary" onclick="saveExtraTask()" style="margin-top:4px;">Guardar tarea →</button>
+    <button class="btn-primary" onclick="saveExtraTask()" style="margin-top:4px;" data-i18n="btn_save_task">Guardar tarea →</button>
   </div>
 </div>
 
@@ -97,43 +97,43 @@
 <div class="modal-overlay" id="extra-session-modal" style="display:none;" onclick="if(event.target===this)closeExtraSessionModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;">
-      <div class="modal-title">Sesión extra</div>
+      <div class="modal-title" data-i18n="ttl_extra_session">Sesión extra</div>
       <button class="modal-close" onclick="closeExtraSessionModal()">✕</button>
     </div>
     <div class="form-row">
-      <div class="field-label">Fecha</div>
+      <div class="field-label" data-i18n="lbl_date">Fecha</div>
       <input class="form-input" type="date" id="es-date">
     </div>
     <div class="form-row">
-      <div class="field-label">Hora</div>
+      <div class="field-label" data-i18n="lbl_time">Hora</div>
       <span id="es-time-wrap"></span>
     </div>
     <div class="form-row">
-      <div class="field-label">Tipo</div>
+      <div class="field-label" data-i18n="lbl_type">Tipo</div>
       <div class="recurrence-row">
-        <button class="rec-opt selected" data-val="reposicion" onclick="selectEsTipo(this)">Reposición</button>
-        <button class="rec-opt" data-val="primera_vez" onclick="selectEsTipo(this)">Primera vez</button>
-        <button class="rec-opt" data-val="extra" onclick="selectEsTipo(this)">Extra</button>
+        <button class="rec-opt selected" data-val="reposicion" onclick="selectEsTipo(this)" data-i18n="btn_type_reposicion">Reposición</button>
+        <button class="rec-opt" data-val="primera_vez" onclick="selectEsTipo(this)" data-i18n="btn_type_first">Primera vez</button>
+        <button class="rec-opt" data-val="extra" onclick="selectEsTipo(this)" data-i18n="btn_type_extra">Extra</button>
       </div>
     </div>
     <div class="form-row">
-      <div class="field-label">Cliente</div>
+      <div class="field-label" data-i18n="lbl_client">Cliente</div>
       <div class="recurrence-row" style="margin-bottom:8px;">
-        <button class="rec-opt selected" data-val="list" onclick="selectEsType(this)">De la lista</button>
-        <button class="rec-opt" data-val="free" onclick="selectEsType(this)">Nombre libre</button>
+        <button class="rec-opt selected" data-val="list" onclick="selectEsType(this)" data-i18n="btn_from_list">De la lista</button>
+        <button class="rec-opt" data-val="free" onclick="selectEsType(this)" data-i18n="btn_free_name">Nombre libre</button>
       </div>
       <div id="es-list-section">
         <select class="form-input" id="es-client"></select>
       </div>
       <div id="es-free-section" style="display:none;">
-        <input class="form-input" id="es-client-name" placeholder="Nombre del cliente…" type="text">
+        <input class="form-input" id="es-client-name" placeholder="Nombre del cliente…" data-i18n-ph="ph_client_name" type="text">
         <div class="form-row" style="margin-top:8px;">
-          <div class="field-label">Caballo</div>
+          <div class="field-label" data-i18n="lbl_horse">Caballo</div>
           <select class="form-input" id="es-horse-free"></select>
         </div>
       </div>
     </div>
-    <button class="btn-primary" onclick="saveExtraSession()" style="margin-top:4px;">Guardar sesión →</button>
+    <button class="btn-primary" onclick="saveExtraSession()" style="margin-top:4px;" data-i18n="btn_save_session">Guardar sesión →</button>
   </div>
 </div>
 
@@ -141,44 +141,44 @@
 <div class="modal-overlay" id="client-modal" style="display:none;" onclick="if(event.target===this)closeClientModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;">
-      <div class="modal-title" id="cm-title">Nuevo cliente</div>
+      <div class="modal-title" id="cm-title" data-i18n="ttl_client_new">Nuevo cliente</div>
       <button class="modal-close" onclick="closeClientModal()">✕</button>
     </div>
     <input type="hidden" id="cm-id">
     <div class="form-row">
-      <div class="field-label">Nombre</div>
-      <input class="form-input" type="text" id="cm-name" placeholder="Nombre del cliente…">
+      <div class="field-label" data-i18n="lbl_name">Nombre</div>
+      <input class="form-input" type="text" id="cm-name" placeholder="Nombre del cliente…" data-i18n-ph="ph_client_name">
     </div>
     <div class="form-row">
-      <div class="field-label">Caballo</div>
+      <div class="field-label" data-i18n="lbl_horse">Caballo</div>
       <select class="form-input" id="cm-horse"></select>
     </div>
     <div class="form-row">
-      <div class="field-label">Diagnóstico</div>
+      <div class="field-label" data-i18n="lbl_diagnosis">Diagnóstico</div>
       <textarea class="form-input" id="cm-diagnosis" rows="2" placeholder="…" style="resize:vertical;"></textarea>
     </div>
     <div class="form-row">
-      <div class="field-label">Notas</div>
+      <div class="field-label" data-i18n="lbl_notes">Notas</div>
       <textarea class="form-input" id="cm-notes" rows="2" placeholder="…" style="resize:vertical;"></textarea>
     </div>
     <div class="form-row">
-      <div class="field-label">Tutor / responsable</div>
-      <input class="form-input" id="cm-tutor" type="text" placeholder="Nombre del tutor…">
+      <div class="field-label" data-i18n="lbl_guardian">Tutor / responsable</div>
+      <input class="form-input" id="cm-tutor" type="text" placeholder="Nombre del tutor…" data-i18n-ph="ph_guardian">
     </div>
     <div class="form-row">
-      <div class="field-label">Teléfono</div>
+      <div class="field-label" data-i18n="lbl_phone">Teléfono</div>
       <input class="form-input" id="cm-phone" type="tel" placeholder="809…">
     </div>
     <div class="form-row">
-      <div class="field-label">Correo</div>
-      <input class="form-input" id="cm-email" type="email" placeholder="correo@…">
+      <div class="field-label" data-i18n="lbl_email_short">Correo</div>
+      <input class="form-input" id="cm-email" type="email" placeholder="correo@…" data-i18n-ph="ph_email_at">
     </div>
     <div class="form-row">
-      <div class="field-label">Dirección</div>
-      <input class="form-input" id="cm-address" type="text" placeholder="Dirección…">
+      <div class="field-label" data-i18n="lbl_address">Dirección</div>
+      <input class="form-input" id="cm-address" type="text" placeholder="Dirección…" data-i18n-ph="ph_address">
     </div>
     <div id="cm-history"></div>
-    <button class="btn-primary" onclick="saveClient()" style="margin-top:4px;">Guardar →</button>
+    <button class="btn-primary" onclick="saveClient()" style="margin-top:4px;" data-i18n="btn_save">Guardar →</button>
   </div>
 </div>
 
@@ -186,16 +186,16 @@
 <div class="modal-overlay" id="delete-pin-modal" style="display:none;" onclick="if(event.target===this)closeDeletePinModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;">
-      <div class="modal-title" id="delete-pin-title">Eliminar cliente</div>
+      <div class="modal-title" id="delete-pin-title" data-i18n="ttl_delete_client">Eliminar cliente</div>
       <button class="modal-close" onclick="closeDeletePinModal()">✕</button>
     </div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">Esta acción no se puede deshacer.</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px;" data-i18n="msg_irreversible">Esta acción no se puede deshacer.</div>
     <div class="form-row">
-      <div class="field-label">Código de confirmación</div>
+      <div class="field-label" data-i18n="lbl_confirm_code">Código de confirmación</div>
       <input class="form-input" id="delete-pin-input" type="password" placeholder="••••" maxlength="4" inputmode="numeric">
     </div>
-    <div id="delete-pin-error" style="font-size:13px;color:var(--red);display:none;margin-top:-4px;">Código incorrecto</div>
-    <button class="btn-primary" onclick="confirmDeletePin()" style="margin-top:4px;background:var(--red);">Eliminar definitivamente →</button>
+    <div id="delete-pin-error" style="font-size:13px;color:var(--red);display:none;margin-top:-4px;" data-i18n="err_wrong_code">Código incorrecto</div>
+    <button class="btn-primary" onclick="confirmDeletePin()" style="margin-top:4px;background:var(--red);" data-i18n="btn_delete_forever">Eliminar definitivamente →</button>
   </div>
 </div>
 
@@ -203,7 +203,7 @@
 <div class="modal-overlay" id="edit-plan-modal" style="display:none;" onclick="if(event.target===this)closeEditPlanModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;">
-      <div class="modal-title">Editar plan semanal</div>
+      <div class="modal-title" data-i18n="ttl_edit_week_plan">Editar plan semanal</div>
       <button class="modal-close" onclick="closeEditPlanModal()">✕</button>
     </div>
     <div id="edit-plan-content"></div>
@@ -214,41 +214,41 @@
 <div class="modal-overlay" id="wplan-modal" style="display:none;" onclick="if(event.target===this)closeWplanModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;">
-      <div class="modal-title" id="wplan-modal-title">Agregar al plan</div>
+      <div class="modal-title" id="wplan-modal-title" data-i18n="ttl_add_to_plan">Agregar al plan</div>
       <button class="modal-close" onclick="closeWplanModal()">✕</button>
     </div>
     <div class="form-row">
-      <div class="field-label">Tipo de tarea</div>
+      <div class="field-label" data-i18n="lbl_task_type">Tipo de tarea</div>
       <div class="recurrence-row">
-        <button class="rec-opt selected" data-val="existing" onclick="selectWplanType(this)">Existente</button>
-        <button class="rec-opt" data-val="custom" onclick="selectWplanType(this)">Nueva</button>
+        <button class="rec-opt selected" data-val="existing" onclick="selectWplanType(this)" data-i18n="btn_existing">Existente</button>
+        <button class="rec-opt" data-val="custom" onclick="selectWplanType(this)" data-i18n="btn_new">Nueva</button>
       </div>
     </div>
     <div id="wplan-existing-section">
       <div class="form-row">
-        <div class="field-label">Seleccionar tarea</div>
+        <div class="field-label" data-i18n="lbl_select_task">Seleccionar tarea</div>
         <select class="form-input" id="wplan-task-select" style="padding:10px 12px;margin-bottom:0;"></select>
       </div>
     </div>
     <div id="wplan-custom-section" style="display:none;">
       <div class="form-row">
-        <div class="field-label">Nombre de la tarea</div>
-        <input class="form-input" id="wplan-custom-name" placeholder="Ej: Reparar cerca" type="text">
+        <div class="field-label" data-i18n="lbl_task_name">Nombre de la tarea</div>
+        <input class="form-input" id="wplan-custom-name" placeholder="Ej: Reparar cerca" data-i18n-ph="ph_task_fence" type="text">
       </div>
     </div>
     <div class="form-row">
-      <div class="field-label">Hora de inicio</div>
+      <div class="field-label" data-i18n="lbl_start_time">Hora de inicio</div>
       <span id="wplan-time-wrap"></span>
     </div>
     <div class="form-row">
-      <div class="field-label">Duración (minutos)</div>
-      <input class="form-input" id="wplan-dur" type="number" min="5" max="480" placeholder="Ej: 45">
+      <div class="field-label" data-i18n="lbl_dur">Duración (minutos)</div>
+      <input class="form-input" id="wplan-dur" type="number" min="5" max="480" placeholder="Ej: 45" data-i18n-ph="ph_dur_45">
     </div>
     <div class="form-row">
-      <div class="field-label">Nota (opcional)</div>
-      <input class="form-input" id="wplan-note" type="text" placeholder="Instrucciones adicionales…">
+      <div class="field-label" data-i18n="lbl_note_opt">Nota (opcional)</div>
+      <input class="form-input" id="wplan-note" type="text" placeholder="Instrucciones adicionales…" data-i18n-ph="ph_note_extra">
     </div>
-    <button class="btn-primary" onclick="saveWplanTask()" style="margin-top:4px;">Guardar →</button>
+    <button class="btn-primary" onclick="saveWplanTask()" style="margin-top:4px;" data-i18n="btn_save">Guardar →</button>
   </div>
 </div>
 
@@ -256,7 +256,7 @@
 <div class="modal-overlay" id="history-modal" style="display:none;" onclick="if(event.target===this)closeHistoryModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;margin-bottom:4px;">
-      <div class="modal-title" id="history-modal-title">Historial</div>
+      <div class="modal-title" id="history-modal-title" data-i18n="ttl_history">Historial</div>
       <button class="modal-close" onclick="closeHistoryModal()">✕</button>
     </div>
     <div id="history-modal-content"></div>
@@ -267,29 +267,29 @@
 <div class="modal-overlay" id="absence-modal" style="display:none;" onclick="if(event.target===this)closeAbsenceModal()">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;">
-      <div class="modal-title">Marcar ausencia injustificada</div>
+      <div class="modal-title" data-i18n="abs_title">Marcar ausencia injustificada</div>
       <button class="modal-close" onclick="closeAbsenceModal()">✕</button>
     </div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">
-      Este día descontará una meta completa del balance. Quedará visible con tu nombre.
+      <span data-i18n="abs_warning">Este día descontará una meta completa del balance. Quedará visible con tu nombre.</span>
     </div>
     <input type="hidden" id="ab-user-id">
     <div class="form-row">
-      <div class="field-label">Persona</div>
+      <div class="field-label" data-i18n="lbl_person">Persona</div>
       <div class="form-input" id="ab-user-name" style="background:var(--surface2);"></div>
     </div>
     <div class="form-row">
-      <div class="field-label">Fecha</div>
+      <div class="field-label" data-i18n="lbl_date">Fecha</div>
       <input class="form-input" id="ab-date" type="date">
     </div>
     <div class="form-row">
-      <div class="field-label">Nota (opcional)</div>
-      <input class="form-input" id="ab-note" type="text" placeholder="Motivo o comentario…">
+      <div class="field-label" data-i18n="lbl_note_opt">Nota (opcional)</div>
+      <input class="form-input" id="ab-note" type="text" placeholder="Motivo o comentario…" data-i18n-ph="ph_reason">
     </div>
-    <button class="btn-primary" onclick="saveAbsence()" style="margin-top:4px;background:var(--red);">Registrar ausencia →</button>
+    <button class="btn-primary" onclick="saveAbsence()" style="margin-top:4px;background:var(--red);" data-i18n="abs_btn_save">Registrar ausencia →</button>
   </div>
 </div>
 
-<script src="app.js?v=7"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
