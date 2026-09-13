@@ -23,6 +23,33 @@ each login shows a genuinely different application. Password for all accounts:
 | `pesticero` | `luis.pesticero@vistaverde-demo.com` | Daily farm view: own task list, clock-in, overtime balance |
 | `volunteer` | `carlos.voluntario@vistaverde-demo.com` | Volunteer view: task pool, own hours |
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-stablehand-daily-en.png" width="180" alt="Stablehand daily view: clock, clock-in button and today's task plan"><br><sub><b>Stablehand</b> · Daily plan</sub></td>
+    <td align="center"><img src="docs/screenshots/04-coordinator-office-daily-en.png" width="180" alt="Coordinator office view: clock-in, hours balance and today's office tasks"><br><sub><b>Coordinator</b> · Office day</sub></td>
+    <td align="center"><img src="docs/screenshots/07-manager-team-en.png" width="180" alt="Manager team view: each person's hours and status today, plus a weekly summary"><br><sub><b>Manager</b> · Team hours</sub></td>
+    <td align="center"><img src="docs/screenshots/09-volunteer-tasks-en.png" width="180" alt="Volunteer task pool: shared tasks with their last completion and a Done button"><br><sub><b>Volunteer</b> · Task pool</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/03-stablehand-weekly-en.png" width="180" alt="Stablehand weekly view: day picker, the day's plan and the weekly and fortnightly task pools"><br><sub><b>Stablehand</b> · Weekly plan</sub></td>
+    <td align="center"><img src="docs/screenshots/05-coordinator-schedule-en.png" width="180" alt="Coordinator therapy agenda for one day, with day picker and a button to add a session"><br><sub><b>Coordinator</b> · Therapy agenda</sub></td>
+    <td align="center"><img src="docs/screenshots/08-manager-inventory-en.png" width="180" alt="Manager inventory: stock per item with urgent and this-week alerts"><br><sub><b>Manager</b> · Inventory alerts</sub></td>
+    <td align="center"><img src="docs/screenshots/06-manager-volunteers-en.png" width="180" alt="Manager operations view: volunteer tasks with when and by whom each was last done"><br><sub><b>Manager</b> · Volunteer tasks</sub></td>
+  </tr>
+</table>
+
+Every role can switch the whole interface between English and Spanish, task and inventory
+names included:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-stablehand-daily-en.png" width="180" alt="Stablehand daily view in English"> <img src="docs/screenshots/02-stablehand-daily-es.png" width="180" alt="The same stablehand daily view in Spanish"><br><sub><b>Stablehand</b> · English / Español</sub></td>
+    <td align="center"><img src="docs/screenshots/09-volunteer-tasks-en.png" width="180" alt="Volunteer task pool in English"> <img src="docs/screenshots/10-volunteer-tasks-es.png" width="180" alt="The same volunteer task pool in Spanish"><br><sub><b>Volunteer</b> · English / Español</sub></td>
+  </tr>
+</table>
+
 ## Features
 
 - **Therapy scheduling** — recurring weekly slots per client and horse, materialised into
@@ -36,8 +63,9 @@ each login shows a genuinely different application. Password for all accounts:
 - **Inventory** — stock levels with thresholds and point-in-time snapshots
 - **Bilingual UI** — every role can switch the whole interface between Spanish and
   English; the choice is stored per user in `profiles.language`. Dates and numbers follow
-  the selected language. Data entered by staff (task names, notes, client records) stays
-  in Spanish, except the volunteer task pool, which carries its own English column
+  the selected language. Task, volunteer-pool and inventory names carry their own English
+  columns and switch along; anything typed into the app itself (notes, client records, a
+  newly added extra task or stock item) stays as entered
 
 ## Tech stack
 
